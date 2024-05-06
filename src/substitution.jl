@@ -186,13 +186,13 @@ end
 
 
 """
-    rate_matrix(substitution_model::JC)::Matrix{Float64}
+    rate_matrix(model::JC)::Matrix{Float64}
 
 Generate the rate matrix for the Jukes-Cantor (JC) model. This model assumes equal probability
 of substitution between any two different nucleotides, scaled by the stationary distribution.
 
 # Arguments
-- `substitution_model::JC`: An instance of the JC model containing base frequencies.
+- `model::JC`: An instance of the JC model containing base frequencies.
 
 # Returns
 - `Matrix{Float64}`: The rate matrix for the JC model, where all substitutions are equally likely.
@@ -202,22 +202,22 @@ of substitution between any two different nucleotides, scaled by the stationary 
 model = JC()
 rate_matrix = rate_matrix(model)
 """
-function rate_matrix(substitution_model::JC)::Matrix{Float64}
-    π = substitution_model.π
+function rate_matrix(model::JC)::Matrix{Float64}
+    π = model.π
     Q_bare = ones(4,4) - I
     return rate_matrix(π, Q_bare)
 end
 
 
 """
-    rate_matrix(substitution_model::F81)::Matrix{Float64}
+    rate_matrix(model::F81)::Matrix{Float64}
 
 Generate the rate matrix for the Felsenstein 81 (F81) model. This model allows for different
 base frequencies and assumes all substitutions not involving the same base occur at rates
 proportional to the equilibrium frequency of the target base.
 
 # Arguments
-- `substitution_model::F81`: An instance of the F81 model containing base frequencies.
+- `model::F81`: An instance of the F81 model containing base frequencies.
 
 # Returns
 - `Matrix{Float64}`: The rate matrix for the F81 model, accounting for different target base frequencies.
@@ -227,8 +227,8 @@ proportional to the equilibrium frequency of the target base.
 model = F81(π=[0.1, 0.2, 0.3, 0.4])
 rate_matrix = rate_matrix(model)
 """
-function rate_matrix(substitution_model::F81)::Matrix{Float64}
-    π = substitution_model.π
+function rate_matrix(model::F81)::Matrix{Float64}
+    π = model.π
     Q_bare = ones(4,4) - I
     return rate_matrix(π, Q_bare)
 end
@@ -250,23 +250,23 @@ and transversion rates. Transitions occur at a rate κ times the rate of transve
 model = K2P(κ=2.0)
 rate_matrix = rate_matrix(model)
 """
-function rate_matrix(substitution_model::K2P)::Matrix{Float64}
-    π = substitution_model.π
-    κ = substitution_model.κ
+function rate_matrix(model::K2P)::Matrix{Float64}
+    π = model.π
+    κ = model.κ
     Q_bare = [0. 1. κ 1.; 1. 0. 1. κ; κ 1. 0. 1.; 1. κ 1. 0.]
     return rate_matrix(π, Q_bare)
 end   
 
 
 """
-    rate_matrix(substitution_model::HKY)::Matrix{Float64}
+    rate_matrix(model::HKY)::Matrix{Float64}
 
 Generate the rate matrix for the Hasegawa-Kishino-Yano (HKY) model. This model differentiates
 between transitions and transversions by providing a different rate for transitions (scaled by κ),
 and assumes different base frequencies.
 
 # Arguments
-- `substitution_model::HKY`: An instance of the HKY model containing the transition/transversion ratio and base frequencies.
+- `model::HKY`: An instance of the HKY model containing the transition/transversion ratio and base frequencies.
 
 # Returns
 - `Matrix{Float64}`: The rate matrix for the HKY model, differentiating transition and transversion rates.
@@ -276,9 +276,9 @@ and assumes different base frequencies.
 model = HKY(κ=2.0, π=[0.1, 0.2, 0.3, 0.4])
 rate_matrix = rate_matrix(model)
 """
-function rate_matrix(substitution_model::HKY)::Matrix{Float64}
-    π = substitution_model.π
-    κ = substitution_model.κ
+function rate_matrix(model::HKY)::Matrix{Float64}
+    π = model.π
+    κ = model.κ
     Q_bare = [0. 1. κ 1.; 1. 0. 1. κ; κ 1. 0. 1.; 1. κ 1. 0.]
     return rate_matrix(π, Q_bare)
 end
@@ -305,8 +305,8 @@ rate_matrix = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
 model = GTR(rate_matrix, π)
 adjusted_matrix = rate_matrix(model)
 """
-function rate_matrix(substitution_model::GTR{<:Number})::Matrix{Float64}
-    π = substitution_model.π
-    Q = substitution_model.Q
+function rate_matrix(model::GTR{<:Number})::Matrix{Float64}
+    π = model.π
+    Q = model.Q
     return rate_matrix(π, Q)
 end
