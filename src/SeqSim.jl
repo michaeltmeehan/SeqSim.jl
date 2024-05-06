@@ -8,11 +8,13 @@ using UnPack
 
 include("utils.jl")
 include("substitution.jl")
+include("clock.jl")
+include("site.jl")
 include("sequencesimulator.jl")
 
 
-export JC, F81, HKY, StrictClock, SiteModel
+export JC, F81, K2P, HKY, GTR, StrictClock, SiteModel
 export nucleotides
-export simulate_sequence, simulate_sequences!
+export rate_matrix, simulate_sequence, simulate_sequences!
 
 end # module SeqSim
