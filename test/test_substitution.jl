@@ -49,15 +49,14 @@
     end
 
     # Test for General Time Reversible Model
-    # @testset "General Time Reversible Model" begin
-    #     rate_matrix_input = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
-    #     model = GTR(rate_matrix=rate_matrix_input, π=[0.25, 0.25, 0.25, 0.25])
-    #     @test model.π == [0.25, 0.25, 0.25, 0.25]  # Check base frequencies
-    #     rm = rate_matrix(model)
-    #     @test size(rm) == (4, 4)  # Ensure the matrix is of correct size
-    #     @test all(isapprox.(sum(rm, dims=1), 0.; atol=1e-5)) # Ensure that each row sums to zero
-    #     # @test isapprox(rm[1, 2], π[2])  # Test if rate matrix follows time-reversibility
-        # @test all(isapprox.(rm * model.π, 0; atol=1e-5))    # Stationarity
-        # @test issymmetric(rm * diagm(model.π))   # Detailed balance
-    # end
+    @testset "General Time Reversible Model" begin
+        Q = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
+        model = GTR(Q=Q, π=[0.25, 0.25, 0.25, 0.25])
+        @test model.π == [0.25, 0.25, 0.25, 0.25]  # Check base frequencies
+        rm = rate_matrix(model)
+        @test size(rm) == (4, 4)  # Ensure the matrix is of correct size
+        @test all(isapprox.(sum(rm, dims=1), 0.; atol=1e-5)) # Ensure that each row sums to zero
+        @test all(isapprox.(rm * model.π, 0; atol=1e-5))    # Stationarity
+        @test issymmetric(rm * diagm(model.π))   # Detailed balance
+    end
 end

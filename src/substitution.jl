@@ -133,32 +133,24 @@ allowing different rates for all types of substitutions and different base frequ
 This model is essential for accurately modeling the complex evolutionary patterns in DNA sequences.
 
 # Fields
-- `rate_matrix::Matrix{Float64}`: A 4x4 matrix of substitution rates, where each element [i, j] represents the rate from nucleotide i to j.
+- `Q::Matrix{Float64}`: A 4x4 matrix of substitution rates, where each element [i, j] represents the rate from nucleotide i to j.
 - `π::Vector{Float64}`: A vector of base frequencies for each nucleotide (A, C, G, T) that must sum to 1.
 
 # Example
 ```julia
-rate_matrix = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
+Q = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
 π = [0.25, 0.25, 0.25, 0.25]
-model = GTR(rate_matrix, π)
+model = GTR(Q, π)
 """
 @with_kw mutable struct GTR{T<:Number} <: SubstitutionModel
-    rate_matrix::Matrix{T}
+    Q::Matrix{T}
     π::Vector{Float64}
     # Constructor with checks for rate_matrix time-reversibility
-    function GTR{T}(rate_matrix::Matrix{T}, π::Vector{Float64}) where T <: Number
+    function GTR{T}(Q::Matrix{T}, π::Vector{Float64}) where T <: Number
         sum(π) ≈ 1.0 || error("The sum of the base frequencies (π) must be 1. Received sum = $(sum(π))")
         any(π .< 0) && error("All base frequencies must be non-negative. Received frequencies = $π")
-    
-        # Check for time-reversibility
-        for i in 1:length(π)
-            for j in 1:length(π)
-                if i != j && abs(π[i] * rate_matrix[i, j] - π[j] * rate_matrix[j, i]) > 1e-5
-                    error("Rate matrix is not time-reversible. Failed at (i=$i, j=$j)")
-                end
-            end
-        end
-    new{T}(rate_matrix, π)
+        issymmetric(Q * diagm(π)) || error("Rate matrix is not time-reversible")
+    new{T}(Q, π)
     end
 end
 
@@ -173,7 +165,7 @@ each row sums to zero, which is a requirement for a valid rate matrix in continu
 
 # Arguments
 - `π::Vector{Float64}`: Stationary distribution vector, where each element represents the equilibrium frequency of a nucleotide.
-- `Q_bare::Matrix{Float64}`: A base rate matrix where each element `[i, j]` represents the unscaled rate of substitution from nucleotide `i` to `j`.
+- `Q_bare::Matrix{<:Number}`: A base rate matrix where each element `[i, j]` represents the unscaled rate of substitution from nucleotide `i` to `j`.
 
 # Returns
 - `Matrix{Float64}`: A valid rate matrix where each row sums to zero.
@@ -184,7 +176,7 @@ each row sums to zero, which is a requirement for a valid rate matrix in continu
 Q_bare = ones(4, 4) - I  # Basic rate matrix with no self-transitions
 rate_matrix = rate_matrix(π, Q_bare)
 """
-function rate_matrix(π::Vector{Float64}, Q_bare::Matrix{Float64})::Matrix{Float64}
+function rate_matrix(π::Vector{Float64}, Q_bare::Matrix{<:Number})::Matrix{Float64}
     Q = π .* Q_bare
     for i in 1:4
         Q[i,i] = -sum(Q[:,i])
@@ -289,4 +281,32 @@ function rate_matrix(substitution_model::HKY)::Matrix{Float64}
     κ = substitution_model.κ
     Q_bare = [0. 1. κ 1.; 1. 0. 1. κ; κ 1. 0. 1.; 1. κ 1. 0.]
     return rate_matrix(π, Q_bare)
+end
+
+
+"""
+    calculate_rate_matrix(model::GTR{T}) where T <: Number -> Matrix{T}
+
+Calculate the rate matrix for a General Time Reversible (GTR) model. This function assumes that
+the input rate matrix and the stationary probabilities already satisfy the detailed balance condition.
+This function simply ensures that the rows of the resulting matrix sum to zero, which is a requirement
+for a valid rate matrix in continuous-time Markov models.
+
+# Arguments
+- `model::GTR{T}`: An instance of the GTR model with predefined rate matrix and base frequencies.
+
+# Returns
+- `Matrix{T}`: A rate matrix adjusted such that each row sums to zero.
+
+# Example
+```julia
+π = [0.25, 0.25, 0.25, 0.25]
+rate_matrix = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
+model = GTR(rate_matrix, π)
+adjusted_matrix = rate_matrix(model)
+"""
+function rate_matrix(substitution_model::GTR{<:Number})::Matrix{Float64}
+    π = substitution_model.π
+    Q = substitution_model.Q
+    return rate_matrix(π, Q)
 end
