@@ -5,9 +5,11 @@ version = "0.1.0"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+BioSequences = "7e6ae17a-c86d-528c-b3b9-7f778a29fe59"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 Phylo = "aea672f4-3940-5932-aa44-993d1c3ff149"
+ProfileView = "c46f51b8-102a-5cf2-8d2c-8597cb0e0da7"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"

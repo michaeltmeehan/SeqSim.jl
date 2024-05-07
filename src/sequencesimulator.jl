@@ -1,6 +1,9 @@
 
-const nucleotides = ['a', 'c', 'g', 't']
+const nucleotides = [DNA_A, DNA_C, DNA_G, DNA_T]
 const nucleotide_idx = Dict(zip(nucleotides, 1:4))
+
+const P = [1. 0. 0. 0.; 0. 1. 0. 0.; 0. 0. 1. 0.; 0. 0. 0. 1.]
+const weights = Dict([nucleotides[i] => P[:, i] for i in 1:4])
 
 
 """
@@ -13,18 +16,18 @@ Generate a random sequence of nucleotides for the root of a phylogenetic tree.
 - `frequencies::Vector{Float64}`: Frequencies of each nucleotide, corresponding to ['a', 'c', 'g', 't'].
 
 # Returns
-- `Vector{Char}`: A vector of characters representing the sequence of nucleotides.
+- `Vector{DNA}`: A vector of characters representing the sequence of nucleotides.
 
 # Example
 ```julia
 simulate_sequence(10, [0.1, 0.2, 0.3, 0.4])
 """
-function simulate_sequence(n::Int64, frequencies::Vector{Float64})::Vector{Char}
+function simulate_sequence(n::Int64, frequencies::Vector{Float64})::Vector{DNA}
     n ≤ 0 && throw(ArgumentError("Sequence length must be a positive integer. Received: $n"))
     length(frequencies) != 4 && throw(ArgumentError("Require four frequencies. Provided $(length(frequencies))"))
     any(frequencies .< 0.) && throw(ArgumentError("Frequencies cannot be negative. Received: $(frequencies)"))
     isapprox(sum(frequencies), 1.0; atol=1e-5) || throw(ArgumentError("Frequencies must sum to 1. Received: $(frequencies)"))
-    return sample(nucleotides, Weights(frequencies), n, replace=true)
+    return rand(SamplerWeighted(nucleotides, frequencies[1:3]), n)
 end
 
 
@@ -94,7 +97,6 @@ Mutates the transition probability matrix `P` in place based on the rate matrix'
 
 # Notes
 - This function assumes that the eigen-decomposition (`D`, `V`, `V⁻¹`) is precomputed and passed as parameters.
-- Warnings are issued if the computed transition matrix contains significant imaginary parts, suggesting numerical issues.
 
 # Example
 ```julia
@@ -105,17 +107,20 @@ weights = compute_transition_weights!(P, 1.0, 0.05, λ, V, V⁻¹)
 """
 function compute_transition_weights!(P::Matrix{Float64}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}) where T <: Number
     P .= V * diagm(exp.(μ * λ * Δt)) * V⁻¹
-    weights = Dict{Char, Vector}()
     for i in 1:4
-        weights[nucleotides[i]] = cumsum([P[mod_wrap(i+j, 4), i] for j in 0:3]) # Returned as cyclic permutations
-        weights[nucleotides[i]] ./= weights[nucleotides[i]][end]
+        prob = 0.
+        for j in 0:3
+            prob += P[mod_wrap(i+j, 4), i]
+            weights[nucleotides[i]][j+1] = P[mod_wrap(i+j, 4), i]
+        end
+        weights[nucleotides[i]] ./= prob
     end
     return weights
 end
 
 
 """
-    propagate_sequence(seq_in::Vector{Char}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}) where T <: Number -> Vector{Char}
+    propagate_sequence(seq_in::Vector{DNA}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}) where T <: Number -> Vector{Char}
 
 Propagate a sequence through evolutionary time, applying nucleotide transitions based on precomputed transition probabilities.
 
@@ -136,15 +141,20 @@ seq = ['a', 'c', 'g', 't']
 λ, V, V⁻¹ = decompose(Q)
 new_seq = propagate_sequence(seq, μ, Δt, λ, V, V⁻¹)
 """
-function propagate_sequence(seq_in::Vector{Char}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64})::Vector{Char} where T <: Number
+function propagate_sequence(seq_in::Vector{DNA}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64})::Vector{DNA} where T <: Number
     seq_out = copy(seq_in)
     weights = compute_transition_weights!(P, μ, Δt, λ, V, V⁻¹)
     for i in eachindex(seq_in)
         nucl = seq_in[i]
         r = rand()
-        if r > weights[nucl][1]
+        prob = weights[nucl][1]
+        if r > prob
             nucl_idx = nucleotide_idx[nucl]
-            idx = findfirst(x -> x >= r, weights[nucl])
+            idx = 1
+            while r >= prob
+                idx += 1
+                prob += weights[nucl][idx]
+            end
             seq_out[i] = nucleotides[mod_wrap(idx + nucl_idx - 1, 4)]
         end
     end

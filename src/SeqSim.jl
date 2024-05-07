@@ -1,5 +1,6 @@
 module SeqSim
 
+using BioSequences
 using LinearAlgebra
 using Parameters
 using Phylo
@@ -11,10 +12,12 @@ include("substitution.jl")
 include("clock.jl")
 include("site.jl")
 include("sequencesimulator.jl")
+include("sequenceanalysis.jl")
 
 
 export JC, F81, K2P, HKY, GTR, StrictClock, SiteModel
-export nucleotides
+export nucleotides, weights
 export decompose, rate_matrix, simulate_sequence, simulate_sequences!, mod_wrap, compute_transition_weights!, propagate_sequence
+export tip_sequences
 
 end # module SeqSim

@@ -14,6 +14,7 @@ Install `SeqSim.jl` using the Julia package manager. From the Julia REPL, type t
 
 
 julia> using Pkg
+
 julia> Pkg.add("SeqSim")
 
 
