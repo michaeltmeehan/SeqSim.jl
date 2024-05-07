@@ -21,6 +21,7 @@ simulate_sequence(10, [0.1, 0.2, 0.3, 0.4])
 """
 function simulate_sequence(n::Int64, frequencies::Vector{Float64})::Vector{Char}
     n ≤ 0 && throw(ArgumentError("Sequence length must be a positive integer. Received: $n"))
+    length(frequencies) != 4 && throw(ArgumentError("Require four frequencies. Provided $(length(frequencies))"))
     any(frequencies .< 0.) && throw(ArgumentError("Frequencies cannot be negative. Received: $(frequencies)"))
     isapprox(sum(frequencies), 1.0; atol=1e-5) || throw(ArgumentError("Frequencies must sum to 1. Received: $(frequencies)"))
     return sample(nucleotides, Weights(frequencies), n, replace=true)
@@ -54,7 +55,7 @@ simulate_sequences!(tree, 100, site_model)
 """
 function simulate_sequences!(tree::RootedTree, seq_length::Int64, site_model::SiteModel)
     seq_length ≤ 0 && throw(ArgumentError("Sequence length must be a positive integer. Received: $seq_length"))
-    isempty(tree) && throw(ArgumentError("The provided tree is empty."))
+    nnodes(tree) == 0 && throw(ArgumentError("The provided tree is empty."))
 
     @unpack mutation_rate, gamma_category_count, gamma_shape, substitution_model = site_model
     μ = mutation_rate
