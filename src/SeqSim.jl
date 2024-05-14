@@ -1,3 +1,15 @@
+"""
+Module `SeqSim` for simulating DNA sequences along the branches of a phylogenetic tree.
+
+# Exports
+- `JC, F81, K2P, HKY, GTR, rate_matrix`
+- `StrictClock`
+- `SiteModel, assign_rate_categories`
+- `nucleotides, weights`
+- `decompose, mod_wrap`
+- `simulate_sequence, simulate_sequences!, compute_transition_weights!, propagate_sequence, assign_rates, update_site`
+- `tip_sequences`
+"""
 module SeqSim
 
 using BioSequences

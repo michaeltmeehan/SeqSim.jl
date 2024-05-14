@@ -7,43 +7,73 @@
 - Simulates sequence evolution on phylogenetic trees.
 - Provides tools for both stochastic and deterministic simulation approaches.
 - Customizable for different evolutionary scenarios.
+- Variable site models with gamma distribution for rate heterogeneity.
+- Handles invariant sites in sequence simulations.
 
 ## Installation
 
 Install `SeqSim.jl` using the Julia package manager. From the Julia REPL, type the following command:
 
-
-julia> using Pkg
-
-julia> Pkg.add("SeqSim")
-
+    julia> using Pkg
+    julia> Pkg.add("SeqSim")
 
 Alternatively, you can install the latest version directly from GitHub:
 
-
-julia> Pkg.add(url="https://github.com/AITHM/SeqSim.jl.git")
-
-
+    julia> Pkg.add(url="https://github.com/AITHM/SeqSim.jl.git")
 
 ## Usage
 
+### Basic Example
+
 Here is a basic example of how to simulate sequences using `SeqSim.jl`:
 
-```julia
-using Phylo
-using SeqSim
+```
+    using Phylo
+    using SeqSim
 
-# Define a substitution model
-model = JC()  # Jukes-Cantor model
+    # Define a substitution model
+    model = JC()  # Jukes-Cantor model
 
-# Create a random phylogenetic tree
-tree = rand(Nonultrametric(10))  # 10 taxa
+    # Create a random phylogenetic tree
+    tree = rand(Nonultrametric(10))  # 10 taxa
 
-# Simulate sequences
-sequences = simulate_sequences!(tree, 100, model)  # 100 base pairs long sequences
+    # Simulate sequences
+    simulate_sequences!(tree, 100, model)  # 100 base pairs long sequences
 
-# Print the resulting sequences
-println(sequences)
+    # Print the resulting sequences
+    sequences = tip_sequences(tree)
+    println(sequences)
+```
+
+### Advanced Example with Variable Sites
+
+This example shows how to simulate sequences with a model that includes variable sites and rate heterogeneity:
+```
+    using Phylo
+    using SeqSim
+    using BioSequences
+
+    # Define a substitution model
+    substitution_model = HKY(κ=2.0, π=[0.1, 0.2, 0.3, 0.4])  # Hasegawa-Kishino-Yano model
+
+    # Define a site model with gamma distribution for rate heterogeneity
+    site_model = SiteModel(
+        mutation_rate = 1.0,
+        gamma_category_count = 4,
+        gamma_shape = 0.5,
+        proportion_invariant = 0.1,
+        substitution_model = substitution_model
+    )
+
+    # Create a random phylogenetic tree
+    tree = rand(Nonultrametric(10))  # 10 taxa
+
+    # Simulate sequences
+    simulate_sequences!(tree, 100, site_model)  # 100 base pairs long sequences
+
+    # Print the resulting sequences
+    sequences = tip_sequences(tree)
+    println(sequences)
 ```
 
 ## Substitution Models
@@ -56,15 +86,18 @@ println(sequences)
 
 Each model can be customized with specific evolutionary parameters, such as transition/transversion rates, nucleotide frequencies, and more.
 
+## Variable Site Models
+
+The package supports models with variable sites using gamma distributions for rate heterogeneity and allows the inclusion of invariant sites. This can be configured through the `SiteModel` struct, enabling more realistic simulations of sequence evolution.
+
 ## Testing
 
 To run tests after installation, navigate to the package directory and run:
 
-```julia
-using Pkg
-Pkg.test("SeqSim")
 ```
-
+    using Pkg
+    Pkg.test("SeqSim")
+```
 
 
 ## Contributing
@@ -77,4 +110,3 @@ Contributions to `SeqSim.jl` are welcome. To contribute:
 5. Submit a pull request.
 
 Please make sure to update tests as appropriate.
-

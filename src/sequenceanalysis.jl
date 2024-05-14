@@ -1,6 +1,4 @@
 
-using Phylo  # Make sure to include this if it's not already in the file
-
 """
     tip_sequences(tree::RootedTree)::Dict{String, Vector{Char}}
 
