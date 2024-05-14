@@ -48,29 +48,26 @@
 end
 
 
+@testset "assign_rate_categories Function Tests" begin
 
-# Define a test suite for site_rates
-@testset "SiteRates Function Tests" begin
+    model = SiteModel(mutation_rate=0.1, gamma_shape=2.0, proportion_invariant=0.1, gamma_category_count=4, substitution_model=JC())
 
     # Test 1: Basic functionality
-    model = SiteModel(mutation_rate=0.1, gamma_shape=2.0, proportion_invariant=0.1, substitution_model=JC())
-    rates = site_rates(model, 100_000)
-    @test length(rates) == 100_000
-    @test isapprox(sum(rates .== 0.0), 10_000; atol=500)  # Allowing some variation
-    @test isapprox(mean(rates), 0.1; atol=1e-3)
+    @test length(assign_rate_categories(model, 100)) == 100
 
-    # Test 2: Zero gamma shape
-    model_zero_gamma = SiteModel(mutation_rate=0.1, gamma_shape=0.0, proportion_invariant=0.1, substitution_model=JC())
-    rates_zero_gamma = site_rates(model_zero_gamma, 100)
-    @test all(rates_zero_gamma .== 0.1)
+    # Test 2: Proportion invariant
+    @test isapprox(sum(assign_rate_categories(model, 10_000) .== 1), 1_000; atol=500)
 
-    # Test 3: Edge cases for proportion_invariant
-    model_no_inv = SiteModel(mutation_rate=0.1, gamma_shape=2.0, proportion_invariant=0.0, substitution_model=JC())
-    rates_no_inv = site_rates(model_no_inv, 100)
-    @test all(rates_no_inv .> 0.0)
+    # Test 3: Category range
+    model_high_count = SiteModel(mutation_rate=0.1, gamma_shape=2.0, proportion_invariant=0.1, gamma_category_count=10, substitution_model=JC())
+    categories = assign_rate_categories(model_high_count, 100)
+    @test all(1 .<= categories .<= 11)  # 1 for invariant, 2:11 for variable
 
-    # Test 4: Input validation
-    @test_throws ArgumentError site_rates(model, -1)
+    # Test 6: Edge cases
+    @test length(assign_rate_categories(model, 1)) == 1
+    @test length(assign_rate_categories(model, 10000)) == 10000
+
+    # Test 7: Input validation
+    @test_throws ArgumentError assign_rate_categories(model, -100)
 
 end
-
