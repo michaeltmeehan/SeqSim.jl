@@ -31,8 +31,8 @@ Here is a basic example of how to simulate sequences using `SeqSim.jl`:
     using Phylo
     using SeqSim
 
-    # Define a substitution model
-    model = JC()  # Jukes-Cantor model
+    # Define a site model
+    model = SiteModel(mutation_rate=1e-2)
 
     # Create a random phylogenetic tree
     tree = rand(Nonultrametric(10))  # 10 taxa
@@ -42,7 +42,6 @@ Here is a basic example of how to simulate sequences using `SeqSim.jl`:
 
     # Print the resulting sequences
     sequences = tip_sequences(tree)
-    println(sequences)
 ```
 
 ### Advanced Example with Variable Sites
@@ -73,7 +72,6 @@ This example shows how to simulate sequences with a model that includes variable
 
     # Print the resulting sequences
     sequences = tip_sequences(tree)
-    println(sequences)
 ```
 
 ## Substitution Models
