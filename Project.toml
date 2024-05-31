@@ -6,6 +6,7 @@ version = "0.1.0"
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 BioSequences = "7e6ae17a-c86d-528c-b3b9-7f778a29fe59"
+BioSymbols = "3c28c6f8-a34d-59c4-9654-267d177fcfa9"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 EpiSim = "baf66cd8-34c1-424a-92fd-19e59a9b7bce"
 Lazy = "50d2b5c4-7a5e-59d5-8109-a42b560f39c0"

@@ -1,6 +1,6 @@
 # TODO: Consider adding LongSequence option for memory savings (cutoff seems to be around 100 characters)
 # seq = dna"ACG"
-
+# To construct sequences see: https://github.com/BioJulia/BioSequences.jl/blob/master/docs/src/construction.md
 
 const nucleotides = [DNA_A, DNA_C, DNA_G, DNA_T]
 const nucleotide_idx = Dict(zip(nucleotides, 1:4))
@@ -95,6 +95,9 @@ function simulate_sequences!(tree::RootedTree, seq_length::Int64, site_model::Si
         node.data["sequence"] = propagate_sequence(parent.data["sequence"], μ, Δt, λ, V, V⁻¹, P, weights)
     end
 end
+
+
+@forward Phylogeny.tree simulate_sequences!
 
 
 """

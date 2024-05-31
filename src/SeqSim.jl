@@ -13,12 +13,14 @@ Module `SeqSim` for simulating DNA sequences along the branches of a phylogeneti
 module SeqSim
 
 using BioSequences
+using BioSymbols
 using Distributions
 using Lazy
 using LinearAlgebra
 using Parameters
 using Phylo
 using StatsBase
+using TreeSim
 using UnPack
 
 include("utils.jl")
