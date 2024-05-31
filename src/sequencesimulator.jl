@@ -1,37 +1,8 @@
-# TODO: Consider adding LongSequence option for memory savings (cutoff seems to be around 100 characters)
 # seq = dna"ACG"
 # To construct sequences see: https://github.com/BioJulia/BioSequences.jl/blob/master/docs/src/construction.md
 
 const nucleotides = [DNA_A, DNA_C, DNA_G, DNA_T]
 const nucleotide_idx = Dict(zip(nucleotides, 1:4))
-
-
-"""
-    simulate_sequence(n::Int64, frequencies::Vector{<:Number})::Vector{DNA}
-
-Generate a random sequence of nucleotides for the root of a phylogenetic tree, using the provided frequencies for each nucleotide.
-This function leverages `SamplerWeighted` from the BioSequences package, which expects the first three elements of the frequency vector;
-the last frequency is automatically calculated to make the total sum to 1.
-
-# Arguments
-- `n::Int64`: Length of the sequence to generate.
-- `frequencies::Vector{<:Number}`: Frequencies of each nucleotide, corresponding to ['A', 'C', 'G', 'T'].
-
-# Returns
-- `Vector{DNA}`: A vector of DNA nucleotides.
-
-# Example
-```julia
-simulate_sequence(10, [0.1, 0.2, 0.3, 0.4])  # The function automatically calculates the frequency for the fourth nucleotide.
-```
-"""
-function simulate_sequence(n::Int64, frequencies::Vector{<:Number})::Vector{DNA}
-    n ≤ 0 && throw(ArgumentError("Sequence length must be a positive integer. Received: $n"))
-    length(frequencies) != 4 && throw(ArgumentError("Require four frequencies. Provided $(length(frequencies))"))
-    any(frequencies .< 0.) && throw(ArgumentError("Frequencies cannot be negative. Received: $(frequencies)"))
-    isapprox(sum(frequencies), 1.0; atol=1e-5) || throw(ArgumentError("Frequencies must sum to 1. Received: $(frequencies)"))
-    return rand(SamplerWeighted(nucleotides, frequencies[1:3]), n)  # SamplerWeighted only used first n-1 elements of frequencies (final value is calculated from normalized sum)
-end
 
 
 """
@@ -73,7 +44,7 @@ Ensure that the tree has at least one node and that each node, starting from the
 The function throws an ArgumentError if the input conditions are not met, including checks for positive sequence length and non-empty tree structure.
 
 """
-function simulate_sequences!(tree::RootedTree, seq_length::Int64, site_model::SiteModel)
+function simulate_sequences!(tree::RootedTree, seq_length::Int64, site_model::SiteModel; A::Alphabet=DNAAlphabet{2}())
     seq_length ≤ 0 && throw(ArgumentError("Sequence length must be a positive integer. Received: $seq_length"))
     nnodes(tree) == 0 && throw(ArgumentError("The provided tree is empty."))
 
@@ -86,7 +57,9 @@ function simulate_sequences!(tree::RootedTree, seq_length::Int64, site_model::Si
 
     root = getroot(tree)
     isnothing(root) && throw(ArgumentError("The tree has no root."))
-    root.data["sequence"] = simulate_sequence(seq_length, π)
+
+
+    root.data["sequence"] = randseq(A, SamplerWeighted(nucleotides, π[1:end-1]), seq_length)
 
     for node in Iterators.drop(traversal(tree, preorder), 1)    # Skipping the root node
         parent = getparent(tree, node)
@@ -151,7 +124,7 @@ end
 
 
 """
-    propagate_sequence(seq_in::Vector{DNA}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{DNA, Vector{Float64}})::Vector{DNA} where T <: Number
+    propagate_sequence(seq_in::S, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{R, Vector{Float64}})::S where {T <: Number, S <: BioSequence, R <: BioSymbol}
 
 Simulate the evolution of a DNA sequence over a specified time interval using a constant mutation rate.
 
@@ -166,7 +139,7 @@ Simulate the evolution of a DNA sequence over a specified time interval using a 
 - `weights`: Dictionary mapping each nucleotide to a vector of transition probabilities.
 
 # Returns
-- `Vector{DNA}`: The evolved sequence as a vector of `DNA` types.
+- `S <: BioSequence`: The evolved sequence as a vector of `DNA` types.
 
 # Example
 ```julia
@@ -181,7 +154,7 @@ weights = Dict(DNA_A => zeros(4), DNA_C => zeros(4), DNA_G => zeros(4), DNA_T =>
 evolved_seq = propagate_sequence(seq, μ, Δt, λ, V, V⁻¹, P, weights)
 ```
 """
-function propagate_sequence(seq_in::Vector{DNA}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{DNA, Vector{Float64}})::Vector{DNA} where T <: Number
+function propagate_sequence(seq_in::S, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{R, Vector{Float64}})::S where {T <:Number, S <: BioSequence, R <: BioSymbol}
     seq_out = copy(seq_in)
     compute_transition_weights!(P, weights, μ, Δt, λ, V, V⁻¹)
     for i in eachindex(seq_in)
@@ -192,7 +165,7 @@ end
 
 
 """
-    propagate_sequence(seq_in::Vector{DNA}, μ::Vector{Float64}, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{DNA, Vector{Float64}})::Vector{DNA} where T <: Number
+propagate_sequence(seq_in::S, μ::Vector{Float64}, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{R, Vector{Float64}})::Vector{DNA} where {T <: Number, S <: BioSequence, R <: BioSymbol}
 
 Simulate the evolution of a DNA sequence where a proportion of sites are invariant.
 
@@ -203,7 +176,7 @@ Simulate the evolution of a DNA sequence where a proportion of sites are invaria
 - `λ`, `V`, `V⁻¹`, `P`, `weights`: Same as in the constant mutation rate method.
 
 # Returns
-- `Vector{DNA}`: The evolved sequence.
+- `S <: BioSequence`: The evolved sequence.
 
 # Example
 ```julia
@@ -217,7 +190,7 @@ weights = Dict(DNA_A => zeros(4), DNA_C => zeros(4), DNA_G => zeros(4), DNA_T =>
 evolved_seq = propagate_sequence(seq, μ, Δt, λ, V, V⁻¹, P, weights)
 ```
 """
-function propagate_sequence(seq_in::Vector{DNA}, μ::Vector{Float64}, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{DNA, Vector{Float64}})::Vector{DNA} where T <: Number
+function propagate_sequence(seq_in::S, μ::Vector{Float64}, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{R, Vector{Float64}})::S where {T <: Number, S <: BioSequence, R <: BioSymbol}
     seq_out = copy(seq_in)
     compute_transition_weights!(P, weights, maximum(μ), Δt, λ, V, V⁻¹)
     for i in eachindex(seq_in)
@@ -230,7 +203,7 @@ end
 
 
 """
-    propagate_sequence(seq_in::Vector{DNA}, μ::Vector{Tuple{Int64,Float64}}, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{Int64,Dict{DNA, Vector{Float64}}})::Vector{DNA} where T <: Number
+    propagate_sequence(seq_in::S, μ::Vector{Tuple{Int64,Float64}}, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{Int64,Dict{R, Vector{Float64}}})::S where {T <: Number, S <: BioSequence, R <: BioSymbol}
 
 Simulate the evolution of a DNA sequence where each site may have a different mutation rate categorized by rate categories. This method allows for complex models where different groups of sites evolve under different evolutionary pressures or mutation rates.
 
@@ -245,9 +218,9 @@ Simulate the evolution of a DNA sequence where each site may have a different mu
 - `weights`: Dictionary mapping each category to a dictionary that maps each nucleotide to a vector of transition probabilities.
 
 # Returns
-- `Vector{DNA}`: The evolved sequence as a vector of `DNA` types.
+- `S <: BioSequence`: The evolved sequence as a vector of `DNA` types.
 """
-function propagate_sequence(seq_in::Vector{DNA}, μ::Vector{Tuple{Int64,Float64}}, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{Int64,Dict{DNA, Vector{Float64}}})::Vector{DNA} where T <: Number
+function propagate_sequence(seq_in::S, μ::Vector{Tuple{Int64,Float64}}, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}, P::Matrix{Float64}, weights::Dict{Int64,Dict{R, Vector{Float64}}})::S where {T <: Number, S <: BioSequence, R <: BioSymbol}
     seq_out = copy(seq_in)
     for (cat, rate) in unique(μ)
         rate > 0. && compute_transition_weights!(P, weights[cat], rate, Δt, λ, V, V⁻¹)
@@ -262,7 +235,7 @@ end
 
 
 """
-    compute_transition_weights!(P::Matrix{Float64}, weights::Dict{DNA, Vector{Float64}}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}) where T <: Number
+    compute_transition_weights!(P::Matrix{Float64}, weights::Dict{R, Vector{Float64}}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}) where {T <: Number, R <: BioSymbol}
 
 Update the transition probability matrix `P` in place based on the provided eigenvalues `λ`, eigenvectors `V`, and their inverse `V⁻¹`. 
 The function calculates the matrix exponential of the rate matrix scaled by mutation rate `μ` and time interval `Δt`, and uses this to populate `P`.
@@ -294,7 +267,7 @@ V⁻¹ = inv(V)
 compute_transition_weights!(P, weights, μ, Δt, λ, V, V⁻¹)
 ```
 """
-@inline function compute_transition_weights!(P::Matrix{Float64}, weights::Dict{DNA, Vector{Float64}}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}) where T <: Number
+@inline function compute_transition_weights!(P::Matrix{Float64}, weights::Dict{R, Vector{Float64}}, μ::Float64, Δt::Float64, λ::Vector{T}, V::Matrix{T}, V⁻¹::Matrix{T}) where {T <: Number, R <: BioSymbol}
     # Calculate the matrix exponential of the scaled rate matrix
     P .= V * Diagonal(exp.(μ * λ * Δt)) * V⁻¹
 
@@ -313,7 +286,7 @@ end
 
 
 """
-    update_site(nucl::DNA, weights::Dict{DNA, Vector{Float64}}) -> DNA
+    update_site(nucl::DNA, weights::Dict{R, Vector{Float64}}) -> DNA
 
 Update a nucleotide based on given transition weights.
 
@@ -331,7 +304,7 @@ weights = Dict('A' => [0.1, 0.2, 0.3, 0.4])
 updated_nucl = update_site(nucl, weights)
 ```
 """
-@inline function update_site(nucl::DNA, weights::Dict{DNA, Vector{Float64}})
+@inline function update_site(nucl::DNA, weights::Dict{R, Vector{Float64}}) where R <: BioSymbol
     !haskey(weights, nucl) && throw(ArgumentError("No transition weights available for nucleotide '$nucl'"))
 
     # Generate a random number for selecting the transition

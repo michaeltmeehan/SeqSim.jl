@@ -36,7 +36,7 @@ export StrictClock
 export SiteModel, assign_rate_categories
 export nucleotides, weights
 export decompose, mod_wrap
-export simulate_sequence, simulate_sequences!, compute_transition_weights!, propagate_sequence, assign_rates, update_site
+export simulate_sequences!, compute_transition_weights!, propagate_sequence, assign_rates, update_site
 export tip_sequences
 
 end # module SeqSim
