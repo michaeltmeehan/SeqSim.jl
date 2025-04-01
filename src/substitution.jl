@@ -3,14 +3,75 @@ abstract type SubstitutionModel end
 
 
 """
+    rate_matrix(π::Vector{Float64}, R::Matrix{Float64})
+
+Constructs a rate matrix Q given stationary distribution π and raw exchangeability matrix R.
+"""
+function rate_matrix(π::Vector{Float64}, R::Matrix{T}) where T<:Number
+    Q = π .* R
+    Q .-= diagm(0 => sum(Q, dims=1)[:])
+    @assert all(isapprox.(sum(Q, dims=1), 0.; atol=1e-10)) "Rows of Q should sum to 0"
+    @assert issymmetric(Q * Diagonal(π)) "Q should be time-reversible"
+    @assert all(isapprox.(Q * π, 0.; atol=1e-10)) "Q should annihilate π"
+    return Q
+end
+
+
+"""
+    decompose(M::Matrix{<:Number}) -> (λ::Vector{Float64}, V::Matrix{Float64}, V⁻¹::Matrix{Float64})
+
+Decompose a square matrix `M` of any numeric type into its eigenvalues and eigenvectors, with enhanced handling for numerical stability.
+
+This function performs eigen decomposition on a given square matrix `M`, returning the eigenvalues as a vector (`λ`), the matrix of 
+eigenvectors (`V`), and the inverse of the matrix of eigenvectors (`V⁻¹`). It handles matrices with elements of any numeric type, 
+making it highly versatile. The function is robust against potential numerical instability by optionally using the pseudo-inverse 
+when the eigenvector matrix is poorly conditioned.
+
+# Arguments
+- `M`: A square matrix of any numeric type. The matrix must be square to ensure a valid eigen decomposition.
+
+# Returns
+- `λ`: A vector containing the eigenvalues of `M`.
+- `V`: A matrix whose columns are the eigenvectors corresponding to the eigenvalues in `λ`.
+- `V⁻¹`: The inverse of the eigenvector matrix `V`, computed using the pseudo-inverse if `V` is poorly conditioned.
+
+# Example
+```julia
+M = [2.0 0; 0 3.0]
+λ, V, V⁻¹ = decompose(M)
+```
+
+# Notes
+The function checks if M is square and will throw an ArgumentError if this condition is not met.
+If the condition number of V exceeds 1e12, indicating poor conditioning, a pseudo-inverse is used instead of the regular matrix 
+inverse to enhance numerical stability. This is especially useful in applications where precision and stability are crucial, such 
+as in systems dynamics, stability analysis, or when dealing with ill-conditioned matrices. Diagnostic messages about the use of 
+the pseudo-inverse are printed to the console for transparency and can aid in debugging and performance tuning.
+
+# See Also
+eigen: Used to compute eigenvalues and eigenvectors.
+pinv: Used to compute the pseudo-inverse of a matrix.
+"""
+function decompose(M::Matrix{<:Number})
+    size(M, 1) != size(M, 2) && throw(ArgumentError("Matrix must be square to perform eigen decomposition."))
+    λ, V = eigen(M)
+    if cond(V) > 1e12
+        println("Matrix V is poorly condition (cond = $(cond(V))). Using pseudo-inverse for stability.")
+        V⁻¹ = pinv(V)
+    else
+        V⁻¹ = inv(V)
+    end
+    @assert isapprox(V * Diagonal(λ) * V⁻¹, M; atol=1e-10) "Eigen decomposition check failed: V * Diagonal(λ) * V⁻¹ should equal M"
+    return λ, V, V⁻¹
+end
+
+
+"""
     JC <: SubstitutionModel
 
 The Jukes-Cantor (JC) model is a simple substitution model used in phylogenetics.
 It assumes equal base frequencies and equal mutation rates between any pair of bases.
 This model was originally proposed by Jukes and Cantor in their 1969 paper.
-
-# Fields
-- `π::Vector{Float64}`: A vector of base frequencies, defaulting to `[0.25, 0.25, 0.25, 0.25]`, representing equal probabilities for each nucleotide (A, C, G, T).
 
 # Reference
 Jukes, T. H., & Cantor, C. R. (1969). Evolution of protein molecules. In Munro, H. N. (Ed.), Mammalian Protein Metabolism (pp. 21-132). New York: Academic Press.
@@ -19,8 +80,22 @@ Jukes, T. H., & Cantor, C. R. (1969). Evolution of protein molecules. In Munro, 
 ```julia
 model = JC()
 """
-@with_kw mutable struct JC <: SubstitutionModel
-    π::Vector{Float64}=fill(0.25, 4)
+# TODO: Convert diagonalized components to SMatrix{4, 4, Float64} from StaticArrays.jl for performance
+struct JC <: SubstitutionModel
+    π::Vector{Float64}
+    Q::Matrix{Float64}
+    λ::SVector{4, Float64}
+    V::SMatrix{4, 4, Float64}
+    V⁻¹::SMatrix{4, 4, Float64}
+end
+
+
+function JC()
+    π = fill(0.25, 4)
+    R = ones(4, 4) - I
+    Q = rate_matrix(π, R)
+    λ, V, V⁻¹ = decompose(Q)
+    return JC(π, Q, SVector{4}(λ), SMatrix{4,4}(V), SMatrix{4,4}(V⁻¹))
 end
 
 
@@ -32,26 +107,30 @@ base frequencies but maintaining the assumption of equal mutation rates across d
 This model was introduced by Joseph Felsenstein in 1981, providing a method to consider
 different nucleotide frequencies in evolutionary studies.
 
-# Fields
-- `π::Vector{Float64}`: A vector of base frequencies that should sum to 1.
-
 # Reference
 Felsenstein, J. (1981). Evolutionary trees from DNA sequences: a maximum likelihood approach. 
 Journal of Molecular Evolution, 17(6), 368-376.
 
 # Example
 ```julia
-model = F81(π=[0.1, 0.2, 0.3, 0.4])
+model = F81([0.1, 0.2, 0.3, 0.4])
 """
-@with_kw mutable struct F81 <: SubstitutionModel
+struct F81 <: SubstitutionModel
     π::Vector{Float64}
+    Q::Matrix{Float64}
+    λ::SVector{4, Float64}
+    V::SMatrix{4, 4, Float64}
+    V⁻¹::SMatrix{4, 4, Float64}
+end
 
-    # Adding a constructor to check the sum and positivity of frequencies
-    function F81(π::Vector{Float64})
-        any(π .< 0) && error("All frequencies must be non-negative. Received frequencies = $π")
-        sum(π) ≈ 1.0 || error("The sum of the frequencies must be 1. Received sum = $(sum(π))")
-        new(π)
-    end
+
+function F81(π::Vector{Float64})
+    any(π .< 0) && throw(ArgumentError("All frequencies must be non-negative. Received frequencies = $π"))
+    sum(π) ≈ 1.0 || throw(ArgumentError("Base frequencies must sum to 1"))
+    R = ones(4, 4) - I
+    Q = rate_matrix(π, R)
+    λ, V, V⁻¹ = decompose(Q)
+    return F81(π, Q, SVector{4}(λ), SMatrix{4,4}(V), SMatrix{4,4}(V⁻¹))
 end
 
 
@@ -63,32 +142,36 @@ for nucleotide sequences. It distinguishes between transition and transversion m
 substitution rates but equal base frequencies. This model provides a more realistic depiction of molecular evolution than 
 the simpler Jukes-Cantor model by accounting for the fact that transitions often occur at different rates than transversions.
 
-# Fields
-- `κ::Float64`: The transition/transversion ratio, a measure of the relative likelihood of transitions compared to transversions.
-
 # Reference
 Kimura, M. (1980). A simple method for estimating evolutionary rates of base substitutions through comparative 
 studies of nucleotide sequences. Journal of Molecular Evolution, 16(2), 111-120.
 
 # Example
 ```julia
-model = K2P(κ=2.0)
+model = K2P(2.0)
 """
-@with_kw mutable struct K2P <: SubstitutionModel
+struct K2P <: SubstitutionModel
+    π::Vector{Float64}
     κ::Float64  # Transition/Transversion ratio
-    π::Vector{Float64} = fill(0.25, 4)  # Default base frequencies
-
-    # Constructor with check for κ
-    function K2P(κ::Float64, π::Vector{Float64} = fill(0.25, 4))
-        κ ≤ 0 && error("The transition/transversion ratio (κ) must be positive. Received κ = $κ")
-        π != fill(0.25, 4) && any(π .< 0) && error("Base frequencies must be non-negative. Received π = $π")
-        π == fill(0.25, 4) && isapprox(sum(π), 1.0; atol=1e-5) || error("The sum of base frequencies (π) must be 1. Received sum = $(sum(π))")
-        new(κ, π)
-    end
+    Q::Matrix{Float64}
+    λ::SVector{4, Float64}
+    V::SMatrix{4, 4, Float64}
+    V⁻¹::SMatrix{4, 4, Float64}
 end
 
-K2P(κ) = K2P(κ=κ, π=π)
 
+function K2P(κ::Float64)
+    κ > 0 || throw(ArgumentError("κ must be positive"))
+    π = fill(0.25, 4)
+    # A/G and C/T are transitions
+    R = [0 1 κ 1;
+         1 0 1 κ;
+         κ 1 0 1;
+         1 κ 1 0]
+    Q = rate_matrix(π, R)
+    λ, V, V⁻¹ = decompose(Q)
+    return K2P(π, κ, Q, SVector{4}(λ), SMatrix{4,4}(V), SMatrix{4,4}(V⁻¹))
+end
 
 
 """
@@ -99,29 +182,36 @@ providing a more realistic representation of molecular evolution by allowing dif
 This model was proposed by Hasegawa, Kishino, and Yano in 1985 and is particularly useful
 for models involving nucleotide sequences where transitions occur more frequently than transversions.
 
-# Fields
-- `κ::Float64`: The transition/transversion ratio, a measure of the relative likelihood of transition to transversion mutations.
-- `π::Vector{Float64}`: A vector of base frequencies that should sum to 1.
-
 # Reference
 Hasegawa, M., Kishino, H., & Yano, T. (1985). Dating of the human-ape splitting by a molecular clock of mitochondrial DNA. 
 Journal of Molecular Evolution, 22(2), 160-174.
 
 # Example
 ```julia
-model = HKY(κ=2.0, π=[0.1, 0.2, 0.3, 0.4])
+model = HKY([0.1, 0.2, 0.3, 0.4], 2.0)
 """
-@with_kw mutable struct HKY <: SubstitutionModel
-    κ::Float64
+struct HKY <: SubstitutionModel
     π::Vector{Float64}
+    κ::Float64
+    Q::Matrix{Float64}
+    λ::SVector{4, Float64}
+    V::SMatrix{4, 4, Float64}
+    V⁻¹::SMatrix{4, 4, Float64}
+end
 
-    # Constructor with short-circuit evaluation for checking frequencies
-    function HKY(κ::Float64, π::Vector{Float64})
-        any(π .< 0) && error("All frequencies must be non-negative. Received frequencies = $π")
-        sum(π) ≈ 1.0 || error("The sum of the frequencies must be 1. Received sum = $(sum(π))")
-        κ ≤ 0 && error("The transition/transversion ratio (κ) must be positive. Received κ = $κ")
-        new(κ, π)
-    end
+
+# Constructor with short-circuit evaluation for checking frequencies
+function HKY(π::Vector{Float64}, κ::Float64)
+    any(π .< 0) && throw(ArgumentError("All frequencies must be non-negative. Received frequencies = $π"))
+    sum(π) ≈ 1.0 || throw(ArgumentError("The sum of the frequencies must be 1. Received sum = $(sum(π))"))
+    κ ≤ 0 && throw(ArgumentError("The transition/transversion ratio (κ) must be positive. Received κ = $κ"))
+    R = [0 1 κ 1;
+         1 0 1 κ;
+         κ 1 0 1;
+         1 κ 1 0]
+    Q = rate_matrix(π, R)
+    λ, V, V⁻¹ = decompose(Q)
+    return HKY(π, κ, Q, SVector{4}(λ), SMatrix{4,4}(V), SMatrix{4,4}(V⁻¹))
 end
 
 
@@ -132,181 +222,30 @@ The General Time Reversible (GTR) model is the most comprehensive model for nucl
 allowing different rates for all types of substitutions and different base frequencies.
 This model is essential for accurately modeling the complex evolutionary patterns in DNA sequences.
 
-# Fields
-- `Q::Matrix{Float64}`: A 4x4 matrix of substitution rates, where each element [i, j] represents the rate from nucleotide i to j.
-- `π::Vector{Float64}`: A vector of base frequencies for each nucleotide (A, C, G, T) that must sum to 1.
-
 # Example
 ```julia
-Q = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
+rates = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
 π = [0.25, 0.25, 0.25, 0.25]
-model = GTR(Q, π)
+model = GTR(π, rates)
 """
-@with_kw mutable struct GTR{T<:Number} <: SubstitutionModel
-    Q::Matrix{T}
+struct GTR <: SubstitutionModel
     π::Vector{Float64}
-    # Constructor with checks for rate_matrix time-reversibility
-    function GTR{T}(Q::Matrix{T}, π::Vector{Float64}) where T <: Number
-        sum(π) ≈ 1.0 || error("The sum of the base frequencies (π) must be 1. Received sum = $(sum(π))")
-        any(π .< 0) && error("All base frequencies must be non-negative. Received frequencies = $π")
-        issymmetric(Q * diagm(π)) || error("Rate matrix is not time-reversible")
-    new{T}(Q, π)
-    end
+    rates::Matrix{<:Number}
+    Q::Matrix{Float64}
+    λ::SVector{4, Float64}
+    V::SMatrix{4, 4, Float64}
+    V⁻¹::SMatrix{4, 4, Float64}
 end
 
 
-"""
-    rate_matrix(π::Vector{Float64}, Q_bare::Matrix{Float64})::Matrix{Float64}
-
-Calculate the rate matrix for a given substitution model by scaling the base rate matrix (`Q_bare`)
-by the stationary distribution vector (`π`). This function multiplies each off-diagonal element
-of `Q_bare` by the corresponding element in `π`, then adjusts the diagonal elements to ensure that
-each row sums to zero, which is a requirement for a valid rate matrix in continuous-time Markov chains.
-
-# Arguments
-- `π::Vector{Float64}`: Stationary distribution vector, where each element represents the equilibrium frequency of a nucleotide.
-- `Q_bare::Matrix{<:Number}`: A base rate matrix where each element `[i, j]` represents the unscaled rate of substitution from nucleotide `i` to `j`.
-
-# Returns
-- `Matrix{Float64}`: A valid rate matrix where each row sums to zero.
-
-# Examples
-```julia
-π = [0.25, 0.25, 0.25, 0.25]  # Equal base frequencies
-Q_bare = ones(4, 4) - I  # Basic rate matrix with no self-transitions
-rate_matrix = rate_matrix(π, Q_bare)
-"""
-function rate_matrix(π::Vector{Float64}, Q_bare::Matrix{<:Number})::Matrix{Float64}
-    Q = π .* Q_bare
-    for i in 1:4
-        Q[i,i] = -sum(Q[:,i])
-    end
-    return Q
-end
-
-
-"""
-    rate_matrix(model::JC)::Matrix{Float64}
-
-Generate the rate matrix for the Jukes-Cantor (JC) model. This model assumes equal probability
-of substitution between any two different nucleotides, scaled by the stationary distribution.
-
-# Arguments
-- `model::JC`: An instance of the JC model containing base frequencies.
-
-# Returns
-- `Matrix{Float64}`: The rate matrix for the JC model, where all substitutions are equally likely.
-
-# Examples
-```julia
-model = JC()
-rate_matrix = rate_matrix(model)
-"""
-function rate_matrix(model::JC)::Matrix{Float64}
-    π = model.π
-    Q_bare = ones(4,4) - I
-    return rate_matrix(π, Q_bare)
-end
-
-
-"""
-    rate_matrix(model::F81)::Matrix{Float64}
-
-Generate the rate matrix for the Felsenstein 81 (F81) model. This model allows for different
-base frequencies and assumes all substitutions not involving the same base occur at rates
-proportional to the equilibrium frequency of the target base.
-
-# Arguments
-- `model::F81`: An instance of the F81 model containing base frequencies.
-
-# Returns
-- `Matrix{Float64}`: The rate matrix for the F81 model, accounting for different target base frequencies.
-
-# Examples
-```julia
-model = F81(π=[0.1, 0.2, 0.3, 0.4])
-rate_matrix = rate_matrix(model)
-"""
-function rate_matrix(model::F81)::Matrix{Float64}
-    π = model.π
-    Q_bare = ones(4,4) - I
-    return rate_matrix(π, Q_bare)
-end
-
-"""
-    rate_matrix(model::K2P)::Matrix{Float64}
-
-Calculate the rate matrix for the Kimura 2-Parameter (K2P) model, which distinguishes between transition
-and transversion rates. Transitions occur at a rate κ times the rate of transversions.
-
-# Arguments
-- `model::K2P`: An instance of the K2P model containing the transition/transversion ratio (κ).
-
-# Returns
-- `Matrix{Float64}`: The rate matrix for the K2P model, where transitions are κ times more likely than transversions.
-
-# Example
-```julia
-model = K2P(κ=2.0)
-rate_matrix = rate_matrix(model)
-"""
-function rate_matrix(model::K2P)::Matrix{Float64}
-    π = model.π
-    κ = model.κ
-    Q_bare = [0. 1. κ 1.; 1. 0. 1. κ; κ 1. 0. 1.; 1. κ 1. 0.]
-    return rate_matrix(π, Q_bare)
-end   
-
-
-"""
-    rate_matrix(model::HKY)::Matrix{Float64}
-
-Generate the rate matrix for the Hasegawa-Kishino-Yano (HKY) model. This model differentiates
-between transitions and transversions by providing a different rate for transitions (scaled by κ),
-and assumes different base frequencies.
-
-# Arguments
-- `model::HKY`: An instance of the HKY model containing the transition/transversion ratio and base frequencies.
-
-# Returns
-- `Matrix{Float64}`: The rate matrix for the HKY model, differentiating transition and transversion rates.
-
-# Examples
-```julia
-model = HKY(κ=2.0, π=[0.1, 0.2, 0.3, 0.4])
-rate_matrix = rate_matrix(model)
-"""
-function rate_matrix(model::HKY)::Matrix{Float64}
-    π = model.π
-    κ = model.κ
-    Q_bare = [0. 1. κ 1.; 1. 0. 1. κ; κ 1. 0. 1.; 1. κ 1. 0.]
-    return rate_matrix(π, Q_bare)
-end
-
-
-"""
-    calculate_rate_matrix(model::GTR{T}) where T <: Number -> Matrix{T}
-
-Calculate the rate matrix for a General Time Reversible (GTR) model. This function assumes that
-the input rate matrix and the stationary probabilities already satisfy the detailed balance condition.
-This function simply ensures that the rows of the resulting matrix sum to zero, which is a requirement
-for a valid rate matrix in continuous-time Markov models.
-
-# Arguments
-- `model::GTR{T}`: An instance of the GTR model with predefined rate matrix and base frequencies.
-
-# Returns
-- `Matrix{T}`: A rate matrix adjusted such that each row sums to zero.
-
-# Example
-```julia
-π = [0.25, 0.25, 0.25, 0.25]
-rate_matrix = [0 1 2 1; 1 0 1 2; 2 1 0 1; 1 2 1 0]
-model = GTR(rate_matrix, π)
-adjusted_matrix = rate_matrix(model)
-"""
-function rate_matrix(model::GTR{<:Number})::Matrix{Float64}
-    π = model.π
-    Q = model.Q
-    return rate_matrix(π, Q)
+# Constructor with checks for rate_matrix time-reversibility
+function GTR(π::Vector{Float64}, rates::Matrix{T}) where T<:Number
+    length(π) != 4 && throw(ArgumentError("Base frequencies (π) must be a vector of length 4. Received length = $(length(π))"))
+    sum(π) ≈ 1.0 || throw(ArgumentError("The sum of the base frequencies (π) must be 1. Received sum = $(sum(π))"))
+    any(π .< 0) && throw(ArgumentError("All base frequencies must be non-negative. Received frequencies = $π"))
+    size(rates) != (4, 4) && throw(ArgumentError("Rate matrix must be 4x4. Received size = $(size(rates))"))
+    issymmetric(rates * diagm(π)) || throw(ArgumentError("Rate matrix is not time-reversible"))
+    Q = rate_matrix(π, rates)
+    λ, V, V⁻¹ = decompose(Q)
+    return GTR(π, rates, Q, SVector{4}(λ), SMatrix{4,4}(V), SMatrix{4,4}(V⁻¹))
 end
