@@ -62,6 +62,17 @@ function SiteModel(
 end
 
 
+function Base.show(io::IO, model::SiteModel)
+    println(io, "SiteModel")
+    println(io, "  Sequence length      : ", model.sequence_length)
+    println(io, "  Mutation rate        : ", model.mutation_rate)
+    println(io, "  Proportion invariant : ", model.proportion_invariant)
+    println(io, "  Gamma categories     : ", model.gamma_category_count)
+    println(io, "  Gamma shape          : ", model.gamma_shape)
+    println(io, "  Substitution model   : ", nameof(typeof(model.substitution_model)))
+end
+
+
 """
     assign_rates(sequence_length::Int, proportion_invariant::Float64, mutation_rate::Float64, gamma_shape::Float64, gamma_category_count::Int64) -> (Vector{Vector{Int}}, Vector{Float64})
 

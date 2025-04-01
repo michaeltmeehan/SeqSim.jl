@@ -249,3 +249,20 @@ function GTR(π::Vector{Float64}, rates::Matrix{T}) where T<:Number
     λ, V, V⁻¹ = decompose(Q)
     return GTR(π, rates, Q, SVector{4}(λ), SMatrix{4,4}(V), SMatrix{4,4}(V⁻¹))
 end
+
+
+function Base.show(io::IO, model::SubstitutionModel)
+    model_name = nameof(typeof(model))
+    println(io, "$model_name Substitution Model")
+
+    println(io, "π = ", model.π)
+
+    if model isa HKY || model isa K2P
+        println(io, "κ = ", model.κ)
+    end
+
+    if model isa GTR
+        println(io, "Rates = ")
+        show(io, "text/plain", model.rates)
+    end
+end

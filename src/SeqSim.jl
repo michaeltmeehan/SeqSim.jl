@@ -7,15 +7,16 @@ using Random
 using StaticArrays
 using StatsBase
 
+
+include("sequence.jl")
 include("substitution.jl")
 include("site.jl")
 include("sequence_simulator.jl")
-include("sequence.jl")
 
 
 export JC, F81, K2P, HKY, GTR, SubstitutionModel
 export SiteModel
-export update_sequence!
+export rand_seq, update_sequence!
 export Sequence
 
 end # module SeqSim
