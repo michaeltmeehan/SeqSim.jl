@@ -3,6 +3,7 @@ module SeqSim
 using Crayons
 using Distributions
 using LinearAlgebra
+# using LoopVectorization
 using Random
 using StaticArrays
 using StatsBase

@@ -29,35 +29,32 @@ nucleotide_colors = Dict(
 A mutable struct representing a biological sequence or similar data structure.
 
 # Fields
-- `id::Union{Nothing, String, Int}`: An identifier for the sequence, which can be `Nothing`, a `String`, or an `Int`.
-- `sequence::Vector{UInt8}`: The sequence data, stored as a vector of `UInt8` values.
+- `taxon::Union{Nothing, String, Int}`: An identifier for the sequence, which can be `Nothing`, a `String`, or an `Int`.
+- `value::Vector{UInt8}`: The sequence data, stored as a vector of `UInt8` values.
 - `time::Union{Nothing, Float64}`: An optional timestamp or time-related value associated with the sequence, which can be `Nothing` or a `Float64`.
-- `metadata::Dict{Symbol, Any}`: A dictionary for storing additional metadata about the sequence, where keys are `Symbol`s and values can be of any type.
 """
 mutable struct Sequence
-    id::Union{Nothing, String, Int}
-    sequence::Vector{UInt8}
+    taxon::Union{Nothing, String, Int}
+    value::Vector{UInt8}
     time::Union{Nothing, Float64}
-    metadata::Dict{Symbol, Any}
 end
 
 
 """
-    Sequence(seq::Vector{UInt8}; id=nothing, time=nothing, metadata=Dict{Symbol,Any}())
+    Sequence(seq::Vector{UInt8}; taxon=nothing, time=nothing, metadata=Dict{Symbol,Any}())
 
 Constructs a `Sequence` object.
 
 # Arguments
 - `seq::Vector{UInt8}`: The sequence data represented as a vector of `UInt8`.
-- `id`: An optional identifier for the sequence. Defaults to `nothing`.
+- `taxon`: An optional identifier for the sequence. Defaults to `nothing`.
 - `time`: An optional timestamp or time-related information for the sequence. Defaults to `nothing`.
-- `metadata::Dict{Symbol,Any}`: An optional dictionary containing metadata associated with the sequence. Defaults to an empty dictionary.
 
 # Returns
 A `Sequence` object initialized with the provided sequence data and optional parameters.
 """
-function Sequence(seq::Vector{UInt8}; id=nothing, time=nothing, metadata=Dict{Symbol,Any}())
-    return Sequence(id, seq, time, metadata)
+function Sequence(seq::Vector{UInt8}; taxon=nothing, time=nothing)
+    return Sequence(taxon, seq, time)
 end
 
 
@@ -98,23 +95,21 @@ is displayed when printed to an output stream.
 
 # Behavior
 - Displays the `Sequence` object in the format `Sequence(...)`.
-- Includes the `id` field if it is not `nothing`.
-- Displays the `sequence` field as a string of nucleotides, with optional coloring applied.
+- Includes the `taxon` field if it is not `nothing`.
+- Displays the `value` field as a string of nucleotides, with optional coloring applied.
 - Includes the `time` field if it is not `nothing`.
-- Includes the `metadata` field if it is not empty.
 
 This method ensures a clear and informative representation of the `Sequence` object for debugging
 or logging purposes.
 """
 function Base.show(io::IO, seq::Sequence)
     print(io, "Sequence(")
-    seq.id !== nothing && print(io, "id=$(seq.id), ")
-    # print(io, "sequence=\"", join(nucleotides[nucl] for nucl in seq.sequence), "\"")
-    print(io, "sequence=\"")
-    color_sequence(io, join(nucleotides[nucl] for nucl in seq.sequence))
+    seq.taxon !== nothing && print(io, "taxon=$(seq.taxon), ")
+    # print(io, "value=\"", join(nucleotides[nucl] for nucl in seq.value), "\"")
+    print(io, "value=\"")
+    color_sequence(io, join(nucleotides[nucl] for nucl in seq.value))
     print(io, "\"")
     seq.time !== nothing && print(io, ", time=$(seq.time)")
-    !isempty(seq.metadata) && print(io, ", metadata=$(seq.metadata)")
     print(io, ")")
 end
 
@@ -148,12 +143,12 @@ function Base.show(io::IO, ::MIME"text/plain", aln::Vector{Sequence})
     end
 
     # Decode sequences to nucleotides
-    decoded = [join(nucleotides[nucl] for nucl in s.sequence) for s in aln]
-    ids = [s.id === nothing ? "?" : string(s.id) for s in aln]
-    pad = maximum(length.(ids))
+    decoded = [join(nucleotides[nucl] for nucl in seq.value) for seq in aln]
+    taxa = [seq.taxon === nothing ? "?" : string(seq.taxon) for seq in aln]
+    pad = maximum(length.(taxa))
 
-    for (id, seq_str) in zip(ids, decoded)
-        print(io, rpad(id, pad), ": ")
+    for (taxon, seq_str) in zip(taxa, decoded)
+        print(io, rpad(taxon, pad), ": ")
         for nt in seq_str
             crayon = get(nucleotide_colors, nt, identity)  # fallback: identity(x) = x
             print(io, crayon(string(nt)))
@@ -161,6 +156,3 @@ function Base.show(io::IO, ::MIME"text/plain", aln::Vector{Sequence})
         println(io)
     end
 end
-
-
-
