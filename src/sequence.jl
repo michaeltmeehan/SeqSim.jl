@@ -109,8 +109,25 @@ function Base.show(io::IO, seq::Sequence)
     print(io, "value=\"")
     color_sequence(io, join(nucleotides[nucl] for nucl in seq.value))
     print(io, "\"")
-    seq.time !== nothing && print(io, ", time=$(seq.time)")
+    seq.time !== nothing && print(io, ", time=$(round(seq.time, sigdigits=3))")
     print(io, ")")
+end
+
+
+function get_snps(aln::Vector{Sequence})
+    snps = Vector{Int}()
+
+    for site in eachindex(aln[1].value)
+        nucleotide = aln[1].value[site]
+
+        for seq in aln[2:end]
+            if seq.value[site] != nucleotide
+                push!(snps, site)
+                break
+            end
+        end
+    end
+    return snps
 end
 
 
@@ -142,6 +159,17 @@ function Base.show(io::IO, ::MIME"text/plain", aln::Vector{Sequence})
         return
     end
 
+    # Display header summary
+    num_taxa = length(aln)
+    println(io, "Alignment with $num_taxa taxa")
+    # println(io, "Taxa: ", join(first.([seq.taxon for seq in aln], min(5, num_taxa)), ", "), num_taxa > 5 ? ", ..." : "")
+
+    # Compute SNPs and display summary
+    snps = get_snps(aln)
+    num_snps = length(snps)
+    println(io, "Number of SNPs: $num_snps")
+    println(io, "SNP sites: ", join(first(snps, min(5, num_snps)), ", "), num_snps > 5 ? ", ..." : "")
+    println(io, "")
     # Decode sequences to nucleotides
     decoded = [join(nucleotides[nucl] for nucl in seq.value) for seq in aln]
     taxa = [seq.taxon === nothing ? "?" : string(seq.taxon) for seq in aln]
