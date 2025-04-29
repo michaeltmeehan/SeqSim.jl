@@ -153,34 +153,62 @@ Custom `show` method for displaying a vector of `Sequence` objects (an alignment
 - Sequence IDs default to "?" if they are `nothing`.
 - The method uses `rpad` to align sequence IDs and `crayon` for optional nucleotide colorization.
 """
+# Styles
+title_style = Crayon(bold=true)  # Just bold for titles
+value_style = Crayon(foreground=:cyan)
+snp_style = Crayon(foreground=:yellow)
+note_style = Crayon(foreground=:white)  # dimmer note for "more taxa not shown"
+
 function Base.show(io::IO, ::MIME"text/plain", aln::Vector{Sequence})
     if isempty(aln)
-        println(io, "Alignment (empty)")
+        println(io, title_style("Alignment (empty)"))
         return
     end
 
-    # Display header summary
     num_taxa = length(aln)
-    println(io, "Alignment with $num_taxa taxa")
-    # println(io, "Taxa: ", join(first.([seq.taxon for seq in aln], min(5, num_taxa)), ", "), num_taxa > 5 ? ", ..." : "")
+    seq_length = isempty(aln) ? 0 : length(aln[1].value)
 
-    # Compute SNPs and display summary
+    println(io, title_style("Alignment with "), value_style("$(num_taxa) taxa"))
+    println(io, title_style("Sequence length : "), value_style("$seq_length"))
+    
     snps = get_snps(aln)
     num_snps = length(snps)
-    println(io, "Number of SNPs: $num_snps")
-    println(io, "SNP sites: ", join(first(snps, min(5, num_snps)), ", "), num_snps > 5 ? ", ..." : "")
-    println(io, "")
-    # Decode sequences to nucleotides
-    decoded = [join(nucleotides[nucl] for nucl in seq.value) for seq in aln]
-    taxa = [seq.taxon === nothing ? "?" : string(seq.taxon) for seq in aln]
-    pad = maximum(length.(taxa))
+    println(io, title_style("Number of SNPs  : "), value_style("$num_snps"))
+    
+
+    if num_snps > 0 
+        println(io, title_style("SNP sites       : "), snp_style(join(first(snps, min(5, num_snps)), ", ")), 
+        num_snps > 5 ? snp_style(", ...") : "")
+    end
+    println(io)
+
+    # Thresholds for truncation
+    max_taxa_to_display = 5
+    max_seq_length_to_display = 60
+
+    truncate_taxa = num_taxa > max_taxa_to_display
+    truncate_seq = seq_length > max_seq_length_to_display
+
+    num_taxa_display = truncate_taxa ? max_taxa_to_display : num_taxa
+    seq_length_display = truncate_seq ? max_seq_length_to_display : seq_length
+
+    decoded = [join(nucleotides[nucl] for nucl in seq.value[1:seq_length_display]) for seq in aln[1:num_taxa_display]]
+    taxa = [seq.taxon === nothing ? "?" : string(seq.taxon) for seq in aln[1:num_taxa_display]]
+    pad = maximum(length.(taxa)) + 1
 
     for (taxon, seq_str) in zip(taxa, decoded)
         print(io, rpad(taxon, pad), ": ")
         for nt in seq_str
-            crayon = get(nucleotide_colors, nt, identity)  # fallback: identity(x) = x
+            crayon = get(nucleotide_colors, nt, identity)
             print(io, crayon(string(nt)))
         end
+        if truncate_seq
+            print(io, " ...")
+        end
         println(io)
+    end
+
+    if truncate_taxa
+        println(io, note_style("... (" * string(num_taxa - num_taxa_display) * " more taxa not shown)"))
     end
 end
