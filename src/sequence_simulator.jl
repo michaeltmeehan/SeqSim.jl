@@ -62,7 +62,7 @@ function update_sequence!(rng::AbstractRNG,
     for gamma_category in eachindex(μ)
         cumulative_probabilities = cumsum(transition_weights[gamma_category], dims=1)
         @inbounds for site in variable_sites[gamma_category]
-            r = rand()
+            r = rand(rng)
             old_nucleotide = sequence[site]
             updated_nucleotide = 1
             while r ≥ cumulative_probabilities[updated_nucleotide, old_nucleotide]
@@ -73,6 +73,49 @@ function update_sequence!(rng::AbstractRNG,
     end
     return sequence
 end
+
+struct SequenceSimulator{N}
+    site_model::SiteModel
+    decomposition::RateMatrixDecomposition{N}
+    transition_weights::Vector{Matrix{Float64}}
+end
+
+
+function SequenceSimulator(site_model::SiteModel)
+    Q = rate_matrix(site_model.substitution_model)
+    N = size(Q, 1)
+    decomposition = decompose(Q)
+    transition_weights = [zeros(N, N) for _ in 1:site_model.gamma_category_count]
+    return SequenceSimulator{N}(site_model, decomposition, transition_weights)
+end
+
+
+# function (sim::SequenceSimulator{N})(rng::AbstractRNG, sequence::Sequence, Δt::Float64)
+#     sm = sim.site_model
+#     dec = sim.decomposition
+
+#     update_transition_weights!(sim.transition_weights, Δt, sm.μ, dec.λ, dec.V, dec.V⁻¹)
+
+#     for gamma_category in eachindex(sm.μ)
+#         cumulative_probabilities = cumsum(sim.transition_weights[gamma_category], dims=1)
+#         @inbounds for site in sm.variable_sites[gamma_category]
+#             r = rand(rng)
+#             old_nucleotide = sequence.value[site]
+#             updated_nucleotide = 1
+#             while r ≥ cumulative_probabilities[updated_nucleotide, old_nucleotide]
+#                 updated_nucleotide += 1
+#             end
+#             sequence.value[site] = updated_nucleotide
+#         end
+#     end
+
+#     if !isnothing(sequence.time)
+#         sequence.time += Δt
+#     end
+
+#     return sequence
+# end
+
 
 
 function update_sequence!(rng::AbstractRNG, 

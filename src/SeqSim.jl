@@ -18,7 +18,7 @@ include("export.jl")
 
 export JC, F81, K2P, HKY, GTR, SubstitutionModel
 export SiteModel
-export rand_seq, update_sequence!
+export rand_seq, update_sequence!, SequenceSimulator
 export Sequence
 export write_fasta, write_nexus, write_phylip, write_alignment
 
