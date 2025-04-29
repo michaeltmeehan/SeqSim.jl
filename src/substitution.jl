@@ -2,6 +2,9 @@
 abstract type SubstitutionModel end
 
 
+get_frequencies(sub::SubstitutionModel) = hasfield(typeof(sub), :π) ? sub.π : fill(0.25, 4)
+
+
 function rate_matrix(π::Vector{Float64}, R::Matrix{T}) where T<:Number
     Q = π .* R
     Q .-= diagm(0 => sum(Q, dims=1)[:])
@@ -36,7 +39,7 @@ end
 
 struct JC <: SubstitutionModel end
 
-rate_matrix(substitution_model::JC) = rate_matrix(fill(0.25, 4), ones(4,4) - I)
+rate_matrix(sub::JC) = rate_matrix(fill(0.25, 4), ones(4,4) - I)
 
 function Base.show(io::IO, model::JC)
     print(io, "JC model (Jukes-Cantor): equal base frequencies, equal rates")
@@ -47,7 +50,7 @@ struct F81 <: SubstitutionModel
     π::Vector{Float64}
 end
 
-rate_matrix(substitution_model::F81) = rate_matrix(substitution_model.π, ones(4, 4) - I)
+rate_matrix(sub::F81) = rate_matrix(sub.π, ones(4, 4) - I)
 
 function Base.show(io::IO, model::F81)
     print(io, "F81 model: base frequencies = ", model.π)
@@ -59,9 +62,9 @@ struct K2P <: SubstitutionModel
 end
 
 
-function rate_matrix(substitution_model::K2P)
+function rate_matrix(sub::K2P)
     π = fill(0.25, 4)
-    κ = substitution_model.κ
+    κ = sub.κ
     # A/G and C/T are transitions
     R = [0 1 κ 1;
          1 0 1 κ;
@@ -82,9 +85,9 @@ end
 
 
 # Constructor with short-circuit evaluation for checking frequencies
-function rate_matrix(substitution_model::HKY)
-    π = substitution_model.π
-    κ = substitution_model.κ
+function rate_matrix(sub::HKY)
+    π = sub.π
+    κ = sub.κ
     R = [0 1 κ 1;
          1 0 1 κ;
          κ 1 0 1;
@@ -104,7 +107,7 @@ struct GTR <: SubstitutionModel
     rates::Matrix{<:Number}
 end
 
-rate_matrix(substitution_model::GTR) = rate_matrix(substitution_model.π, substitution_model.rates)
+rate_matrix(sub::GTR) = rate_matrix(sub.π, sub.rates)
 
 function Base.show(io::IO, model::GTR)
     print(io, "GTR model:\n")
