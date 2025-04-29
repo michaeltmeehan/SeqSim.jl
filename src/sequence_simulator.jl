@@ -90,31 +90,45 @@ function SequenceSimulator(site_model::SiteModel)
 end
 
 
-# function (sim::SequenceSimulator{N})(rng::AbstractRNG, sequence::Sequence, Δt::Float64)
-#     sm = sim.site_model
-#     dec = sim.decomposition
+function Base.show(io::IO, sim::SequenceSimulator{N}) where {N}
+    sm = sim.site_model
+    println(io, "SequenceSimulator{$N}")
+    println(io, "  Sequence length     : ", sm.sequence_length)
+    println(io, "  Mutation rate       : ", sm.mutation_rate)
+    println(io, "  Substitution model  : ", typeof(sm.substitution_model))
+    println(io, "  Gamma categories    : ", sm.gamma_category_count)
+    println(io, "  Proportion invariant: ", sm.proportion_invariant)
+end
 
-#     update_transition_weights!(sim.transition_weights, Δt, sm.μ, dec.λ, dec.V, dec.V⁻¹)
 
-#     for gamma_category in eachindex(sm.μ)
-#         cumulative_probabilities = cumsum(sim.transition_weights[gamma_category], dims=1)
-#         @inbounds for site in sm.variable_sites[gamma_category]
-#             r = rand(rng)
-#             old_nucleotide = sequence.value[site]
-#             updated_nucleotide = 1
-#             while r ≥ cumulative_probabilities[updated_nucleotide, old_nucleotide]
-#                 updated_nucleotide += 1
-#             end
-#             sequence.value[site] = updated_nucleotide
-#         end
-#     end
 
-#     if !isnothing(sequence.time)
-#         sequence.time += Δt
-#     end
+function (sim::SequenceSimulator{N})(rng::AbstractRNG, sequence::Sequence, Δt::Float64) where {N}
+    sm = sim.site_model
+    @assert length(sequence.value) == sm.sequence_length "Length of sequence does not match expected SiteModel sequence length (got $(length(sequence.value)), expected $(sm.sequence_length))."
 
-#     return sequence
-# end
+    dec = sim.decomposition
+
+    update_transition_weights!(sim.transition_weights, Δt, sm.μ, dec.λ, dec.V, dec.V⁻¹)
+
+    for gamma_category in eachindex(sm.μ)
+        cumulative_probabilities = cumsum(sim.transition_weights[gamma_category], dims=1)
+        for site in sm.variable_sites[gamma_category]
+            r = rand(rng)
+            old_nucleotide = sequence.value[site]
+            updated_nucleotide = 1
+            while r ≥ cumulative_probabilities[updated_nucleotide, old_nucleotide] && updated_nucleotide < N
+                updated_nucleotide += 1
+            end
+            sequence.value[site] = updated_nucleotide
+        end
+    end
+
+    if !isnothing(sequence.time)
+        sequence.time += Δt
+    end
+
+    return sequence
+end
 
 
 
