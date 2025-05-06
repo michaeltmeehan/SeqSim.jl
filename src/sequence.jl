@@ -2,6 +2,26 @@
 A constant array representing the four standard nucleotides in DNA: Adenine ('A'), Cytosine ('C'), Guanine ('G'), and Thymine ('T').
 """
 const nucleotides = ['A', 'C', 'G', 'T']
+const nucleotide_map = Dict(0x01 => 'A', 0x02 => 'C', 0x03 =>  'G', 0x04 => 'T')
+
+function decode(i::UInt8)
+    return nucleotides[i]
+end
+
+
+function decode(v::Vector{UInt8})
+    return join(nucleotides[i] for i in v)
+end
+
+
+function encode(nucleotide::Char)
+    return nucleotide_map[nucleotide]
+end
+
+
+function encode(sequence::AbstractString)
+    return [encode(nucleotide) for nucleotide in sequence]
+end
 
 
 """
@@ -23,54 +43,34 @@ nucleotide_colors = Dict(
 )
 
 
-"""
-    Sequence
+# Styles
+title_style = Crayon(bold=true)  # Just bold for titles
+value_style = Crayon(foreground=:cyan)
+snp_style = Crayon(foreground=:yellow)
+note_style = Crayon(foreground=:white)  # dimmer note for "more taxa not shown"
 
-A mutable struct representing a biological sequence or similar data structure.
 
-# Fields
-- `taxon::Union{Nothing, String, Int}`: An identifier for the sequence, which can be `Nothing`, a `String`, or an `Int`.
-- `value::Vector{UInt8}`: The sequence data, stored as a vector of `UInt8` values.
-- `time::Union{Nothing, Float64}`: An optional timestamp or time-related value associated with the sequence, which can be `Nothing` or a `Float64`.
-"""
-mutable struct Sequence
-    taxon::Union{Nothing, String, Int}
-    value::Vector{UInt8}
+struct Sequence
+    taxon::Union{Nothing, AbstractString, Int}
+    value::AbstractString
     time::Union{Nothing, Float64}
 end
 
 
-"""
-    Sequence(seq::Vector{UInt8}; taxon=nothing, time=nothing, metadata=Dict{Symbol,Any}())
-
-Constructs a `Sequence` object.
-
-# Arguments
-- `seq::Vector{UInt8}`: The sequence data represented as a vector of `UInt8`.
-- `taxon`: An optional identifier for the sequence. Defaults to `nothing`.
-- `time`: An optional timestamp or time-related information for the sequence. Defaults to `nothing`.
-
-# Returns
-A `Sequence` object initialized with the provided sequence data and optional parameters.
-"""
-function Sequence(seq::Vector{UInt8}; taxon=nothing, time=nothing)
+function Sequence(seq::AbstractString; taxon=nothing, time=nothing)
     return Sequence(taxon, seq, time)
 end
 
 
-"""
-    color_sequence(io::IO, sequence::AbstractString)
+function Sequence(seq::Vector{UInt8}; taxon=nothing, time=nothing)
+    value = decode(seq)
+    return Sequence(taxon, value, time)
+end
 
-Prints a color-coded representation of a nucleotide sequence to the given IO stream.
 
-# Arguments
-- `io::IO`: The IO stream where the colored sequence will be printed.
-- `sequence::AbstractString`: The nucleotide sequence to be color-coded and printed.
+const Alignment = Vector{Sequence}
 
-# Details
-Each nucleotide in the sequence is assigned a color based on the `nucleotide_colors` dictionary. If a nucleotide has a corresponding color (represented as a `Crayon` object), it is printed in that color. If no color is defined for a nucleotide, it is printed without any color.
 
-"""
 function color_sequence(io::IO, sequence::AbstractString)
     for nucleotide in sequence
         crayon = get(nucleotide_colors, nucleotide, nothing)
@@ -83,38 +83,32 @@ function color_sequence(io::IO, sequence::AbstractString)
 end
 
 
-"""
-    Base.show(io::IO, seq::Sequence)
-
-Custom `show` method for the `Sequence` type. This method defines how a `Sequence` object
-is displayed when printed to an output stream.
-
-# Arguments
-- `io::IO`: The output stream where the `Sequence` object will be printed.
-- `seq::Sequence`: The `Sequence` object to be displayed.
-
-# Behavior
-- Displays the `Sequence` object in the format `Sequence(...)`.
-- Includes the `taxon` field if it is not `nothing`.
-- Displays the `value` field as a string of nucleotides, with optional coloring applied.
-- Includes the `time` field if it is not `nothing`.
-
-This method ensures a clear and informative representation of the `Sequence` object for debugging
-or logging purposes.
-"""
-function Base.show(io::IO, seq::Sequence)
-    print(io, "Sequence(")
-    seq.taxon !== nothing && print(io, "taxon=$(seq.taxon), ")
-    # print(io, "value=\"", join(nucleotides[nucl] for nucl in seq.value), "\"")
-    print(io, "value=\"")
-    color_sequence(io, join(nucleotides[nucl] for nucl in seq.value))
-    print(io, "\"")
-    seq.time !== nothing && print(io, ", time=$(round(seq.time, sigdigits=3))")
-    print(io, ")")
+function showcompact(io, seq::AbstractString)
+    if isempty(seq)
+        println(io, "< EMPTY SEQUENCE >")
+    else
+        width = displaysize()[2]
+        if length(seq) > width
+            half = div(width, 2)
+            color_sequence(io, seq[1:half-1])
+            print(io, "...")
+            color_sequence(io, seq[end-half+2:end])
+        else
+            color_sequence(io, seq)
+        end
+    end
 end
 
 
-function get_snps(aln::Vector{Sequence})
+function Base.show(io::IO, seq::Sequence)
+    println(io, value_style("$(length(seq.value)) bp "), "nt sequence")
+    showcompact(io, seq.value)    
+    seq.taxon !== nothing && print(io, "\ntaxon=$(seq.taxon), ")
+    seq.time !== nothing && print(io, "\ntime=$(round(seq.time, sigdigits=3))")
+end
+
+
+function get_snps(aln::Alignment)
     snps = Vector{Int}()
 
     for site in eachindex(aln[1].value)
@@ -130,34 +124,6 @@ function get_snps(aln::Vector{Sequence})
     return snps
 end
 
-
-"""
-    Base.show(io::IO, ::MIME"text/plain", aln::Vector{Sequence})
-
-Custom `show` method for displaying a vector of `Sequence` objects (an alignment) in a human-readable format.
-
-# Arguments
-- `io::IO`: The output stream where the alignment will be printed.
-- `::MIME"text/plain"`: Specifies that the output is intended for plain text display.
-- `aln::Vector{Sequence}`: A vector of `Sequence` objects representing the alignment.
-
-# Behavior
-- If the alignment is empty, it prints "Alignment (empty)".
-- For non-empty alignments:
-  - Each sequence is decoded into its nucleotide representation.
-  - Sequence IDs are displayed alongside their corresponding nucleotide sequences.
-  - IDs are padded to align the output for better readability.
-  - Nucleotides are optionally colorized using a predefined mapping (`nucleotide_colors`).
-
-# Notes
-- Sequence IDs default to "?" if they are `nothing`.
-- The method uses `rpad` to align sequence IDs and `crayon` for optional nucleotide colorization.
-"""
-# Styles
-title_style = Crayon(bold=true)  # Just bold for titles
-value_style = Crayon(foreground=:cyan)
-snp_style = Crayon(foreground=:yellow)
-note_style = Crayon(foreground=:white)  # dimmer note for "more taxa not shown"
 
 function Base.show(io::IO, ::MIME"text/plain", aln::Vector{Sequence})
     if isempty(aln)
@@ -184,27 +150,18 @@ function Base.show(io::IO, ::MIME"text/plain", aln::Vector{Sequence})
 
     # Thresholds for truncation
     max_taxa_to_display = 5
-    max_seq_length_to_display = 60
 
     truncate_taxa = num_taxa > max_taxa_to_display
-    truncate_seq = seq_length > max_seq_length_to_display
 
     num_taxa_display = truncate_taxa ? max_taxa_to_display : num_taxa
-    seq_length_display = truncate_seq ? max_seq_length_to_display : seq_length
 
-    decoded = [join(nucleotides[nucl] for nucl in seq.value[1:seq_length_display]) for seq in aln[1:num_taxa_display]]
     taxa = [seq.taxon === nothing ? "?" : string(seq.taxon) for seq in aln[1:num_taxa_display]]
     pad = maximum(length.(taxa)) + 1
 
-    for (taxon, seq_str) in zip(taxa, decoded)
-        print(io, rpad(taxon, pad), ": ")
-        for nt in seq_str
-            crayon = get(nucleotide_colors, nt, identity)
-            print(io, crayon(string(nt)))
-        end
-        if truncate_seq
-            print(io, " ...")
-        end
+    for seq in aln[1:num_taxa_display]
+        label = isnothing(seq.taxon) ? "unknown" : string(seq.taxon)
+        print(io, rpad(label, pad), ": ")
+        showcompact(io, seq.value)
         println(io)
     end
 

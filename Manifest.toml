@@ -2,7 +2,7 @@
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "20c5965567d0ce1297657f8882f32667208d1d98"
+project_hash = "f76be2613e0338df6675d3a76ded5040603bc999"
 
 [[deps.AbstractTrees]]
 git-tree-sha1 = "2d9c9a55f9c93e8887ad391fbae72f8ef55e1177"
@@ -111,6 +111,18 @@ deps = ["Compat", "JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
 git-tree-sha1 = "e38fbc49a620f5d0b660d7f543db1009fe0f8336"
 uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 version = "1.6.0"
+
+[[deps.BioSequences]]
+deps = ["BioSymbols", "PrecompileTools", "Random", "Twiddle"]
+git-tree-sha1 = "b602272be9915fbf41923d9fa67f16309bdf25d6"
+uuid = "7e6ae17a-c86d-528c-b3b9-7f778a29fe59"
+version = "3.4.1"
+
+[[deps.BioSymbols]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "41e42d326ff01d12167f3f8a218b318bf7429d0f"
+uuid = "3c28c6f8-a34d-59c4-9654-267d177fcfa9"
+version = "5.2.0"
 
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
@@ -1511,6 +1523,12 @@ version = "0.4.1"
 uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 version = "1.11.0"
 
+[[deps.SubstitutionModels]]
+deps = ["BioSymbols", "LinearAlgebra", "StaticArrays"]
+git-tree-sha1 = "5e18123c57ff933efff915f4b44eb5d46a4089d1"
+uuid = "8365b1bb-bd83-58ee-a267-f2965fc81c73"
+version = "0.5.0"
+
 [[deps.SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
@@ -1575,6 +1593,11 @@ version = "0.5.3"
 git-tree-sha1 = "0c45878dcfdcfa8480052b6ab162cdd138781742"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.11.3"
+
+[[deps.Twiddle]]
+git-tree-sha1 = "29509c4862bfb5da9e76eb6937125ab93986270a"
+uuid = "7200193e-83a8-5a55-b20d-5d36d44a0795"
+version = "1.1.2"
 
 [[deps.URIs]]
 git-tree-sha1 = "67db6cc7b3821e19ebe75791a9dd19c9b1188f2b"
