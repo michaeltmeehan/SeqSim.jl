@@ -2,7 +2,7 @@
 A constant array representing the four standard nucleotides in DNA: Adenine ('A'), Cytosine ('C'), Guanine ('G'), and Thymine ('T').
 """
 const nucleotides = ['A', 'C', 'G', 'T']
-const nucleotide_map = Dict(0x01 => 'A', 0x02 => 'C', 0x03 =>  'G', 0x04 => 'T')
+const nucleotide_map = Dict('A' => UInt8(1), 'C' => UInt8(2), 'G' => UInt8(3), 'T' => UInt8(4))
 
 function decode(i::UInt8)
     return nucleotides[i]

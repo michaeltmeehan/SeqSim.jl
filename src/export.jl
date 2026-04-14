@@ -1,5 +1,3 @@
-using FilePathsBase  # or just use `splitext` manually
-
 function format_label(seq::Sequence)
     label = isnothing(seq.taxon) ? "unknown" : string(seq.taxon)
     if !isnothing(seq.time)
@@ -8,12 +6,14 @@ function format_label(seq::Sequence)
     return label
 end
 
+dna_string(seq::Sequence) = seq.value
+
 
 function write_fasta(io::IO, alignment::Vector{Sequence})
     wrap_length = 60
     for seq in alignment
         println(io, ">", format_label(seq))
-        dna = join(nucleotides[nt] for nt in seq.value)
+        dna = dna_string(seq)
         for i in 1:wrap_length:length(dna)
             println(io, dna[i:min(i+wrap_length-1, end)])
         end
@@ -33,7 +33,7 @@ function write_nexus(io::IO, alignment::Vector{Sequence})
 
     for seq in alignment
         label = format_label(seq)
-        dna = join(nucleotides[nt] for nt in seq.value)
+        dna = dna_string(seq)
         println(io, "    $label    $dna")
     end
 
@@ -51,7 +51,7 @@ function write_phylip(io::IO, alignment::Vector{Sequence})
     for seq in alignment
         label = format_label(seq)
         short_label = length(label) > 10 ? first(label, 10) : rpad(label, 10)
-        dna = join(nucleotides[nt] for nt in seq.value)
+        dna = dna_string(seq)
         println(io, "$short_label$dna")
     end
 end

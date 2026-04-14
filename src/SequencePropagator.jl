@@ -15,12 +15,17 @@ end
 
 function validate_and_normalize_weights(weights::Vector{Matrix{Float64}})::Vector{Matrix{Float64}}
     for gamma_category in eachindex(weights)
-        for col in eachcol(weights[gamma_category])
-            col_sum = sum(col)
-            if !isapprox(col_sum, 1.0; atol=1e-10)
-                @warn "Column $col in transition_weights[$gamma_category] does not sum to 1.0 (sum = $col_sum). Renormalizing."
-                weights[gamma_category][:, col] ./= col_sum
-            end
+        validate_and_normalize_weights(weights[gamma_category])
+    end
+    return weights
+end
+
+function validate_and_normalize_weights(weights::Matrix{Float64})::Matrix{Float64}
+    for col_index in axes(weights, 2)
+        col_sum = sum(view(weights, :, col_index))
+        if !isapprox(col_sum, 1.0; atol=1e-10)
+            @warn "Column $col_index does not sum to 1.0 (sum = $col_sum). Renormalizing."
+            weights[:, col_index] ./= col_sum
         end
     end
     return weights
@@ -38,7 +43,7 @@ function SequencePropagator(site_model::SiteModel)
     Q = rate_matrix(site_model.substitution_model)
     N = size(Q, 1)
     decomposition = decompose(Q)
-    transition_weights = [zeros(N, N) for _ in 1:site_model.gamma_category_count]
+    transition_weights = [zeros(N, N) for _ in eachindex(site_model.μ)]
     return SequencePropagator{N}(site_model, decomposition, transition_weights)
 end
 
@@ -58,11 +63,11 @@ end
 function (prop::SequencePropagator{N})(rng::AbstractRNG, sequence::Vector{UInt8}, Δt::Float64) where {N}
     dec = prop.decomposition
     sm = prop.site_model
-    @assert length(sequence) == sm.sequence_length "Length of sequence does not match expected SiteModel sequence length (got $(length(sequence.value)), expected $(sm.sequence_length))."
+    @assert length(sequence) == sm.sequence_length "Length of sequence does not match expected SiteModel sequence length (got $(length(sequence)), expected $(sm.sequence_length))."
 
     update_transition_weights!(prop.transition_weights, Δt, sm.μ, dec.λ, dec.V, dec.V⁻¹)
 
-    updated_sequence = Vector{UInt8}(undef, sm.sequence_length)
+    updated_sequence = copy(sequence)
     for gamma_category in eachindex(sm.μ)
         cumulative_probabilities = cumsum(prop.transition_weights[gamma_category], dims=1)
         for site in sm.variable_sites[gamma_category]
