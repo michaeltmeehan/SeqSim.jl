@@ -1,9 +1,7 @@
 
 function rand_seq_int(rng::AbstractRNG, sequence_length::Int, frequencies::Vector{Float64})
-    @assert length(frequencies) == 4 "Frequencies must be a vector of length 4."
-    @assert sum(frequencies) ≈ 1.0 "Frequencies must sum to 1. Received sum = $(sum(frequencies))"
-    @assert all(frequencies .>= 0) "Frequencies must be non-negative. Received frequencies = $frequencies"
     sequence_length > 0 || throw(ArgumentError("Sequence length must be positive."))
+    validate_frequencies(frequencies)
     d = Categorical(frequencies)
     seq = rand(rng, d, sequence_length)
     return UInt8.(seq)  # Convert to UInt8

@@ -5,11 +5,35 @@ abstract type SubstitutionModel end
 get_frequencies(sub::SubstitutionModel) = hasfield(typeof(sub), :π) ? sub.π : fill(0.25, 4)
 
 
+function validate_frequencies(π::Vector{Float64})
+    length(π) == 4 || throw(ArgumentError("Base frequencies must have length 4 in A, C, G, T order."))
+    all(isfinite, π) || throw(ArgumentError("Base frequencies must be finite."))
+    all(π .>= 0.0) || throw(ArgumentError("Base frequencies must be non-negative."))
+    isapprox(sum(π), 1.0; atol=1e-10) || throw(ArgumentError("Base frequencies must sum to 1.0; got $(sum(π))."))
+    return π
+end
+
+
+function validate_exchangeability_matrix(R::Matrix{<:Number})
+    size(R) == (4, 4) || throw(ArgumentError("Exchangeability matrix must be 4x4 for DNA states A, C, G, T."))
+    all(isfinite, R) || throw(ArgumentError("Exchangeability matrix entries must be finite."))
+    all(R .>= 0) || throw(ArgumentError("Exchangeability matrix entries must be non-negative."))
+    isapprox(R, R'; atol=1e-10) || throw(ArgumentError("Exchangeability matrix must be symmetric for reversible DNA models."))
+    return R
+end
+
+
+validate_positive_rate_parameter(name::AbstractString, value::Float64) =
+    (isfinite(value) && value > 0.0) ? value : throw(ArgumentError("$name must be finite and positive."))
+
+
 function rate_matrix(π::Vector{Float64}, R::Matrix{T}) where T<:Number
+    validate_frequencies(π)
+    validate_exchangeability_matrix(R)
     Q = π .* R
     Q .-= diagm(0 => sum(Q, dims=1)[:])
     @assert all(isapprox.(sum(Q, dims=1), 0.; atol=1e-10)) "Rows of Q should sum to 0"
-    @assert issymmetric(Q * Diagonal(π)) "Q should be time-reversible"
+    @assert isapprox(Q * Diagonal(π), transpose(Q * Diagonal(π)); atol=1e-10) "Q should be time-reversible"
     @assert all(isapprox.(Q * π, 0.; atol=1e-10)) "Q should annihilate π"
     return Q
 end
@@ -48,6 +72,10 @@ end
 
 struct F81 <: SubstitutionModel
     π::Vector{Float64}
+
+    function F81(π::Vector{Float64})
+        return new(copy(validate_frequencies(π)))
+    end
 end
 
 rate_matrix(sub::F81) = rate_matrix(sub.π, ones(4, 4) - I)
@@ -59,6 +87,10 @@ end
 
 struct K2P <: SubstitutionModel
     κ::Float64  # Transition/Transversion ratio
+
+    function K2P(κ::Float64)
+        return new(validate_positive_rate_parameter("K2P κ", κ))
+    end
 end
 
 
@@ -81,6 +113,10 @@ end
 struct HKY <: SubstitutionModel
     π::Vector{Float64}
     κ::Float64
+
+    function HKY(π::Vector{Float64}, κ::Float64)
+        return new(copy(validate_frequencies(π)), validate_positive_rate_parameter("HKY κ", κ))
+    end
 end
 
 
@@ -105,6 +141,10 @@ end
 struct GTR <: SubstitutionModel
     π::Vector{Float64}
     rates::Matrix{<:Number}
+
+    function GTR(π::Vector{Float64}, rates::Matrix{<:Number})
+        return new(copy(validate_frequencies(π)), Matrix(validate_exchangeability_matrix(rates)))
+    end
 end
 
 rate_matrix(sub::GTR) = rate_matrix(sub.π, sub.rates)

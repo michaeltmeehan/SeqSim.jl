@@ -1,110 +1,67 @@
 # SeqSim.jl
 
-`SeqSim.jl` is a Julia package developed for simulating DNA sequences for phylogenetic analysis. It supports generating sequences based on various substitution models, including Jukes-Cantor, Kimura, and more sophisticated models like GTR. The package also integrates sequence evolution along phylogenetic trees, taking into account different rates of evolution and other genomic factors.
+`SeqSim.jl` is the standalone sequence and alignment simulation package in the
+recovered outbreak-modelling ecosystem. In the current phase it provides a
+small, explicit DNA sequence/alignment core rather than a broad phylogenetic
+workflow layer.
 
-## Features
-- Supports multiple substitution models (JC, K2P, HKY, GTR, etc.).
-- Simulates sequence evolution on phylogenetic trees.
-- Provides tools for both stochastic and deterministic simulation approaches.
-- Customizable for different evolutionary scenarios.
-- Variable site models with gamma distribution for rate heterogeneity.
-- Handles invariant sites in sequence simulations.
+## Supported scope
 
-## Installation
+The active core currently supports:
 
-Install `SeqSim.jl` using the Julia package manager. From the Julia REPL, type the following command:
+- unambiguous DNA sequences over `A`, `C`, `G`, and `T`
+- `Sequence` objects with optional `taxon` and `time` metadata
+- alignments represented as `Vector{Sequence}` with equal sequence lengths
+- root sequence simulation from base frequencies or a `SiteModel`
+- sequence propagation over elapsed time using `SequencePropagator`
+- substitution models `JC`, `F81`, `K2P`, `HKY`, and `GTR`
+- site models with invariant sites and optional discrete gamma rate categories
+- write-only alignment export to FASTA, NEXUS, and PHYLIP
 
-    julia> using Pkg
-    julia> Pkg.add("SeqSim")
+## Explicitly unsupported for now
 
-Alternatively, you can install the latest version directly from GitHub:
+The current standalone core does not support:
 
-    julia> Pkg.add(url="https://github.com/AITHM/SeqSim.jl.git")
+- RNA, amino acids, ambiguity codes, gaps, or missing sequence states
+- read-side sequence/alignment IO
+- tree package integration or orchestration workflows
+- broad format conversion
+- modelling features beyond the substitution/site models listed above
 
-## Usage
+Future tree-facing behaviour should be added through narrow adapters rather
+than by making this package depend on upstream tree packages.
 
-### Basic Example
+## Basic usage
 
-Here is a basic example of how to simulate sequences using `SeqSim.jl`:
+```julia
+using Random
+using SeqSim
 
-```
-    using Phylo
-    using SeqSim
+rng = MersenneTwister(1)
+substitution_model = HKY([0.25, 0.25, 0.25, 0.25], 2.0)
+site_model = SiteModel(12, 0.1, 2, 1.0, 0.0, substitution_model)
 
-    # Define a site model
-    model = SiteModel(mutation_rate=1e-2)
+root = rand_seq(rng, site_model; taxon="root", time=0.0)
+propagator = SequencePropagator(site_model)
+child_states = propagator(rng, SeqSim.encode(root.value), 0.5)
+child = Sequence(child_states; taxon="child", time=0.5)
 
-    # Create a random phylogenetic tree
-    tree = rand(Nonultrametric(10))  # 10 taxa
-
-    # Simulate sequences
-    simulate_sequences!(tree, 100, model)  # 100 base pairs long sequences
-
-    # Print the resulting sequences
-    sequences = tip_sequences(tree)
-```
-
-### Advanced Example with Variable Sites
-
-This example shows how to simulate sequences with a model that includes variable sites and rate heterogeneity:
-```
-    using Phylo
-    using SeqSim
-    using BioSequences
-
-    # Define a substitution model
-    substitution_model = HKY(κ=2.0, π=[0.1, 0.2, 0.3, 0.4])  # Hasegawa-Kishino-Yano model
-
-    # Define a site model with gamma distribution for rate heterogeneity
-    site_model = SiteModel(
-        mutation_rate = 1.0,
-        gamma_category_count = 4,
-        gamma_shape = 0.5,
-        proportion_invariant = 0.1,
-        substitution_model = substitution_model
-    )
-
-    # Create a random phylogenetic tree
-    tree = rand(Nonultrametric(10))  # 10 taxa
-
-    # Simulate sequences
-    simulate_sequences!(tree, 100, site_model)  # 100 base pairs long sequences
-
-    # Print the resulting sequences
-    sequences = tip_sequences(tree)
+alignment = [root, child]
+write_alignment("alignment.fasta", alignment)
 ```
 
-## Substitution Models
+## Validation
 
-`SeqSim.jl` supports the following substitution models:
-- **JC (Jukes-Cantor)**
-- **K2P (Kimura 2-Parameter)**
-- **HKY (Hasegawa-Kishino-Yano)**
-- **GTR (General Time Reversible)**
-
-Each model can be customized with specific evolutionary parameters, such as transition/transversion rates, nucleotide frequencies, and more.
-
-## Variable Site Models
-
-The package supports models with variable sites using gamma distributions for rate heterogeneity and allows the inclusion of invariant sites. This can be configured through the `SiteModel` struct, enabling more realistic simulations of sequence evolution.
+The current hardening target is described in `VALIDATION.md` and
+`TRUST_CRITERIA.md`. Tests focus on representation invariants, fixed-seed
+reproducibility, compact statistical checks, propagation invariants, and
+write-side IO integrity for the supported formats.
 
 ## Testing
 
-To run tests after installation, navigate to the package directory and run:
+From the package directory:
 
+```julia
+using Pkg
+Pkg.test()
 ```
-    using Pkg
-    Pkg.test("SeqSim")
-```
-
-
-## Contributing
-
-Contributions to `SeqSim.jl` are welcome. To contribute:
-1. Fork the repository.
-2. Create a new branch for your feature.
-3. Add your feature or enhancement.
-4. Write or update tests as necessary.
-5. Submit a pull request.
-
-Please make sure to update tests as appropriate.

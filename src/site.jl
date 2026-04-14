@@ -3,6 +3,13 @@
 
 Represents a model for site-specific mutation rates in a sequence.
 
+The current supported site model assigns every site either to an invariant
+class or to one of a small number of rate categories. A `gamma_category_count`
+of `0` means all variable sites share `mutation_rate`; positive category
+counts use deterministic gamma quantiles. Site assignments are random and use
+the RNG passed to the constructor. The constructor without an explicit RNG uses
+Julia's current global RNG.
+
 # Arguments
 - `sequence_length::Int64`: The total number of sites in the sequence.
 - `mutation_rate::Float64`: The overall mutation rate applied to each site.
@@ -32,6 +39,7 @@ struct SiteModel
 end
 
 function SiteModel(
+    rng::AbstractRNG,
     sequence_length::Int64,
     mutation_rate::Float64,
     gamma_category_count::Int64,
@@ -41,13 +49,15 @@ function SiteModel(
 )
     # Input validation
     sequence_length <= 0 && throw(ArgumentError("Sequence length must be positive."))
-    mutation_rate <= 0.0 && throw(ArgumentError("Mutation rate must be positive."))
+    isfinite(mutation_rate) && mutation_rate > 0.0 || throw(ArgumentError("Mutation rate must be finite and positive."))
     gamma_category_count < 0 && throw(ArgumentError("Gamma category count must be non-negative."))
-    gamma_shape < 0.0 && throw(ArgumentError("Gamma shape must be non-negative."))
+    isfinite(gamma_shape) || throw(ArgumentError("Gamma shape must be finite."))
+    gamma_category_count > 0 && gamma_shape <= 0.0 && throw(ArgumentError("Gamma shape must be positive when gamma categories are used."))
+    gamma_category_count == 0 && gamma_shape < 0.0 && throw(ArgumentError("Gamma shape must be non-negative."))
     (proportion_invariant < 0.0 || proportion_invariant >= 1.0) && throw(ArgumentError("Proportion invariant must be between 0 and 1."))
 
     # Assign rates and variable sites
-    variable_sites, μ = assign_rates(sequence_length, proportion_invariant, mutation_rate, gamma_shape, gamma_category_count)
+    variable_sites, μ = assign_rates(rng, sequence_length, proportion_invariant, mutation_rate, gamma_shape, gamma_category_count)
 
     return SiteModel(
         sequence_length,
@@ -59,6 +69,18 @@ function SiteModel(
         variable_sites,
         μ
     )
+end
+
+
+function SiteModel(
+    sequence_length::Int64,
+    mutation_rate::Float64,
+    gamma_category_count::Int64,
+    gamma_shape::Float64,
+    proportion_invariant::Float64,
+    substitution_model::SubstitutionModel
+)
+    return SiteModel(Random.GLOBAL_RNG, sequence_length, mutation_rate, gamma_category_count, gamma_shape, proportion_invariant, substitution_model)
 end
 
 
@@ -105,12 +127,21 @@ variable_sites, μ = assign_rates(sequence_length, proportion_invariant, mutatio
 In this example, a sequence of 1000 sites is partitioned such that 20% of the sites are invariant, and the remaining sites are divided into 4 categories with mutation rates drawn from a gamma distribution with a shape parameter of 0.5. 
 """
 function assign_rates(
+    rng::AbstractRNG,
     sequence_length::Int,
     proportion_invariant::Float64,
     mutation_rate::Float64,
     gamma_shape::Float64,
     gamma_category_count::Int64
 )
+    sequence_length <= 0 && throw(ArgumentError("Sequence length must be positive."))
+    isfinite(mutation_rate) && mutation_rate > 0.0 || throw(ArgumentError("Mutation rate must be finite and positive."))
+    gamma_category_count < 0 && throw(ArgumentError("Gamma category count must be non-negative."))
+    isfinite(gamma_shape) || throw(ArgumentError("Gamma shape must be finite."))
+    gamma_category_count > 0 && gamma_shape <= 0.0 && throw(ArgumentError("Gamma shape must be positive when gamma categories are used."))
+    gamma_category_count == 0 && gamma_shape < 0.0 && throw(ArgumentError("Gamma shape must be non-negative."))
+    (proportion_invariant < 0.0 || proportion_invariant >= 1.0) && throw(ArgumentError("Proportion invariant must be between 0 and 1."))
+
     # Determine the number of invariant and variable sites
     num_invariant_sites = Int(floor(proportion_invariant * sequence_length))
     num_variable_sites = sequence_length - num_invariant_sites
@@ -119,7 +150,7 @@ function assign_rates(
     variable_sites = Vector{Vector{Int64}}(undef, gamma_category_count > 0 ? gamma_category_count : 1)
 
     # Shuffle site indices
-    all_sites = shuffle(1:sequence_length)
+    all_sites = shuffle(rng, 1:sequence_length)
     invariant_sites = all_sites[1:num_invariant_sites]
     variable_site_indices = all_sites[num_invariant_sites+1:end]
 
@@ -148,4 +179,15 @@ function assign_rates(
     end
 
     return variable_sites, μ
+end
+
+
+function assign_rates(
+    sequence_length::Int,
+    proportion_invariant::Float64,
+    mutation_rate::Float64,
+    gamma_shape::Float64,
+    gamma_category_count::Int64
+)
+    return assign_rates(Random.GLOBAL_RNG, sequence_length, proportion_invariant, mutation_rate, gamma_shape, gamma_category_count)
 end

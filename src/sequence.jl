@@ -1,26 +1,54 @@
 """
-A constant array representing the four standard nucleotides in DNA: Adenine ('A'), Cytosine ('C'), Guanine ('G'), and Thymine ('T').
+The supported DNA alphabet, in the same order as the internal state encoding.
+
+`SeqSim.jl` currently supports unambiguous DNA sequences only. The stable
+external representation is an `AbstractString` containing only `A`, `C`, `G`,
+and `T`; the internal simulator representation uses `UInt8(1):UInt8(4)`.
+Ambiguity codes, gaps, RNA, amino acids, and missing data are intentionally
+unsupported in the current standalone core.
 """
 const nucleotides = ['A', 'C', 'G', 'T']
 const nucleotide_map = Dict('A' => UInt8(1), 'C' => UInt8(2), 'G' => UInt8(3), 'T' => UInt8(4))
 
 function decode(i::UInt8)
+    i in UInt8(1):UInt8(4) || throw(ArgumentError("Encoded nucleotide state must be in 1:4; got $i."))
     return nucleotides[i]
 end
 
 
 function decode(v::Vector{UInt8})
+    validate_encoded_sequence(v)
     return join(nucleotides[i] for i in v)
 end
 
 
 function encode(nucleotide::Char)
+    haskey(nucleotide_map, nucleotide) || throw(ArgumentError("Unsupported DNA symbol '$nucleotide'. Supported symbols are A, C, G, and T."))
     return nucleotide_map[nucleotide]
 end
 
 
 function encode(sequence::AbstractString)
+    validate_dna_sequence(sequence)
     return [encode(nucleotide) for nucleotide in sequence]
+end
+
+
+function validate_dna_sequence(sequence::AbstractString)
+    isempty(sequence) && throw(ArgumentError("Sequence value must not be empty."))
+    for nucleotide in sequence
+        haskey(nucleotide_map, nucleotide) || throw(ArgumentError("Unsupported DNA symbol '$nucleotide'. Supported symbols are A, C, G, and T."))
+    end
+    return sequence
+end
+
+
+function validate_encoded_sequence(sequence::Vector{UInt8})
+    isempty(sequence) && throw(ArgumentError("Encoded sequence must not be empty."))
+    for state in sequence
+        state in UInt8(1):UInt8(4) || throw(ArgumentError("Encoded nucleotide state must be in 1:4; got $state."))
+    end
+    return sequence
 end
 
 
@@ -54,6 +82,12 @@ struct Sequence
     taxon::Union{Nothing, AbstractString, Int}
     value::AbstractString
     time::Union{Nothing, Float64}
+
+    function Sequence(taxon::Union{Nothing, AbstractString, Int}, value::AbstractString, time::Union{Nothing, Float64})
+        validate_dna_sequence(value)
+        time !== nothing && isfinite(time) || time === nothing || throw(ArgumentError("Sequence time must be finite when provided."))
+        return new(taxon, value, time)
+    end
 end
 
 
@@ -69,6 +103,17 @@ end
 
 
 const Alignment = Vector{Sequence}
+
+
+function validate_alignment(alignment::Alignment)
+    isempty(alignment) && throw(ArgumentError("Alignment must contain at least one sequence."))
+    seq_length = length(first(alignment).value)
+    for (index, seq) in pairs(alignment)
+        length(seq.value) == seq_length || throw(ArgumentError("Alignment sequence $index has length $(length(seq.value)); expected $seq_length."))
+        validate_dna_sequence(seq.value)
+    end
+    return alignment
+end
 
 
 function color_sequence(io::IO, sequence::AbstractString)
@@ -109,6 +154,7 @@ end
 
 
 function get_snps(aln::Alignment)
+    validate_alignment(aln)
     snps = Vector{Int}()
 
     for site in eachindex(aln[1].value)

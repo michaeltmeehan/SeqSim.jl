@@ -8,8 +8,27 @@ end
 
 dna_string(seq::Sequence) = seq.value
 
+phylip_label(label::AbstractString) = length(label) > 10 ? first(label, 10) : rpad(label, 10)
+
+
+function validate_export_alignment(alignment::Vector{Sequence})
+    validate_alignment(alignment)
+    labels = format_label.(alignment)
+    length(unique(labels)) == length(labels) || throw(ArgumentError("Formatted alignment labels must be unique for export."))
+    return alignment
+end
+
+
+function validate_phylip_alignment(alignment::Vector{Sequence})
+    validate_export_alignment(alignment)
+    labels = phylip_label.(format_label.(alignment))
+    length(unique(labels)) == length(labels) || throw(ArgumentError("PHYLIP labels must be unique after 10-character truncation."))
+    return alignment
+end
+
 
 function write_fasta(io::IO, alignment::Vector{Sequence})
+    validate_export_alignment(alignment)
     wrap_length = 60
     for seq in alignment
         println(io, ">", format_label(seq))
@@ -22,6 +41,7 @@ end
 
 
 function write_nexus(io::IO, alignment::Vector{Sequence})
+    validate_export_alignment(alignment)
     n_taxa = length(alignment)
     seq_length = length(alignment[1].value)
 
@@ -43,6 +63,7 @@ end
 
 
 function write_phylip(io::IO, alignment::Vector{Sequence})
+    validate_phylip_alignment(alignment)
     n_taxa = length(alignment)
     seq_length = length(alignment[1].value)
 
@@ -50,7 +71,7 @@ function write_phylip(io::IO, alignment::Vector{Sequence})
 
     for seq in alignment
         label = format_label(seq)
-        short_label = length(label) > 10 ? first(label, 10) : rpad(label, 10)
+        short_label = phylip_label(label)
         dna = dna_string(seq)
         println(io, "$short_label$dna")
     end

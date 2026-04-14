@@ -5,7 +5,11 @@ function update_transition_weights!(transition_weights::Vector{Matrix{Float64}},
                                     V::SMatrix{4,4,Float64}, 
                                     V⁻¹::SMatrix{4,4,Float64};
                                     validate_weights::Bool=false)::Vector{Matrix{Float64}}
+    isfinite(Δt) && Δt >= 0.0 || throw(ArgumentError("Elapsed time Δt must be finite and non-negative."))
+    length(transition_weights) == length(μ) || throw(ArgumentError("Number of transition-weight matrices must match number of site-rate categories."))
     for gamma_category in eachindex(transition_weights)
+        size(transition_weights[gamma_category]) == (4, 4) || throw(ArgumentError("Transition-weight matrices must be 4x4 for DNA states A, C, G, T."))
+        isfinite(μ[gamma_category]) && μ[gamma_category] >= 0.0 || throw(ArgumentError("Site-rate category μ[$gamma_category] must be finite and non-negative."))
         transition_weights[gamma_category] .= V * Diagonal(exp.((μ[gamma_category] * Δt) .* λ)) * V⁻¹
         validate_weights && validate_and_normalize_weights(transition_weights[gamma_category])
     end
@@ -63,7 +67,9 @@ end
 function (prop::SequencePropagator{N})(rng::AbstractRNG, sequence::Vector{UInt8}, Δt::Float64) where {N}
     dec = prop.decomposition
     sm = prop.site_model
-    @assert length(sequence) == sm.sequence_length "Length of sequence does not match expected SiteModel sequence length (got $(length(sequence)), expected $(sm.sequence_length))."
+    length(sequence) == sm.sequence_length || throw(ArgumentError("Length of sequence does not match expected SiteModel sequence length (got $(length(sequence)), expected $(sm.sequence_length))."))
+    validate_encoded_sequence(sequence)
+    isfinite(Δt) && Δt >= 0.0 || throw(ArgumentError("Elapsed time Δt must be finite and non-negative."))
 
     update_transition_weights!(prop.transition_weights, Δt, sm.μ, dec.λ, dec.V, dec.V⁻¹)
 
