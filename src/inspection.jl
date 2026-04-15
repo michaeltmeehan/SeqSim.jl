@@ -135,22 +135,23 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", inspection::AlignmentInspection)
     println(io, "AlignmentInspection")
-    println(io, "  Sequences      : ", inspection.sequence_count)
-    println(io, "  Source sites   : ", inspection.site_count)
-    println(io, "  Selected sites : ", length(inspection.selected_sites))
-    inspection.reference !== nothing && println(io, "  Reference      : ", inspection.reference)
+    println(io, "  Sequences          : ", inspection.sequence_count)
+    println(io, "  Alignment sites    : ", inspection.site_count)
+    println(io, "  Selected sites     : ", length(inspection.selected_sites))
+    inspection.reference !== nothing && println(io, "  Reference          : ", inspection.reference)
     isempty(inspection.selected_sites) && return
 
     max_rows = min(5, length(inspection.rows))
-    println(io, "  Site rows      :")
+    println(io, "  Site coordinates   : original alignment positions")
+    println(io, "  Selected-site preview (showing ", max_rows, " of ", length(inspection.rows), "):")
     for row in inspection.rows[1:max_rows]
-        states = join(state_char.(row.observed_states), "")
+        observed = join(state_char.(row.observed_states), "")
         nonref = row.nonreference_frequency === nothing ? "" : ", nonref=$(round(row.nonreference_frequency; sigdigits=3))"
         println(io, "    site ", row.site,
-            " states=", states,
+            " observed=", observed,
             " variable=", row.is_variable,
             " maf=", round(row.minor_allele_frequency; sigdigits=3),
             nonref)
     end
-    length(inspection.rows) > max_rows && println(io, "    ... (", length(inspection.rows) - max_rows, " more sites)")
+    length(inspection.rows) > max_rows && println(io, "    ... (", length(inspection.rows) - max_rows, " more selected sites)")
 end

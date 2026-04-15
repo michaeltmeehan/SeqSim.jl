@@ -3,6 +3,7 @@ using Random
 using SeqSim
 using Test
 
+include("fixtures.jl")
 include("test_representation.jl")
 include("test_processing.jl")
 include("test_inspection.jl")

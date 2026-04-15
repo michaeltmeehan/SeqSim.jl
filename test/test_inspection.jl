@@ -1,10 +1,5 @@
 @testset "alignment inspection helpers" begin
-    alignment = [
-        Sequence("ACGTAA"; taxon="a"),
-        Sequence("ACGTAC"; taxon="b"),
-        Sequence("ATGTCC"; taxon="c"),
-        Sequence("ATGTCT"; taxon="d"),
-    ]
+    alignment = small_alignment_fixture()
 
     @test site_window(alignment, 2, 5) == [2, 3, 4, 5]
     @test centered_site_window(alignment, 1; radius=2) == [1, 2, 3]
@@ -69,7 +64,20 @@
 
     text = sprint(show, MIME"text/plain"(), inspection)
     @test occursin("AlignmentInspection", text)
-    @test occursin("Selected sites : 2", text)
+    @test occursin("Alignment sites    : 6", text)
+    @test occursin("Selected sites     : 2", text)
+    @test occursin("Site coordinates   : original alignment positions", text)
+    @test occursin("Selected-site preview (showing 2 of 2):", text)
     @test occursin("site 6", text)
+    @test occursin("observed=ACT", text)
+    @test !occursin("Source sites", text)
+    @test !occursin("Site rows", text)
+    @test !occursin("states=", text)
     @test occursin("nonref=0.75", text)
+
+    full_inspection = inspect_sites(alignment; sites=:, reference=1)
+    truncated = sprint(show, MIME"text/plain"(), full_inspection)
+    @test occursin("Selected-site preview (showing 5 of 6):", truncated)
+    @test occursin("... (1 more selected sites)", truncated)
+    @test !occursin("more sites)", truncated)
 end

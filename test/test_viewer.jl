@@ -1,10 +1,5 @@
 @testset "lightweight alignment viewer" begin
-    alignment = [
-        Sequence("ACGTAA"; taxon="a"),
-        Sequence("ACGTAC"; taxon="b"),
-        Sequence("ATGTCC"; taxon="c"),
-        Sequence("ATGTCT"; taxon="d"),
-    ]
+    alignment = small_alignment_fixture()
 
     viewer = AlignmentViewer(alignment; max_sequences=2, max_sites=3)
     @test viewer.inspection.selected_sites == [1, 2, 3, 4, 5, 6]

@@ -297,6 +297,16 @@ function consensus_sequence(alignment::Alignment; taxon="consensus", time=nothin
 end
 
 
+"""
+    AlignmentSummary(alignment)
+
+Summarize one alignment by sequence count and site classifications.
+
+`AlignmentSummary` reports counts over alignment sites, not over trees, runs,
+branches, or simulation replicates. With the current unambiguous DNA alphabet,
+variable sites and SNP sites are equivalent. Singleton and
+parsimony-informative counts are subsets of the variable sites.
+"""
 struct AlignmentSummary
     sequence_count::Int
     site_count::Int
@@ -317,4 +327,37 @@ function AlignmentSummary(alignment::Alignment)
         length(singleton_sites(alignment)),
         length(parsimony_informative_sites(alignment)),
     )
+end
+
+
+function percent_string(count::Integer, total::Integer)
+    total == 0 && return "n/a"
+    return string(round(100 * count / total; digits=1), "%")
+end
+
+
+function Base.show(io::IO, summary::AlignmentSummary)
+    print(io, "AlignmentSummary(",
+        summary.sequence_count, " sequences, ",
+        summary.site_count, " sites, ",
+        "variable=", summary.variable_site_count, ", ",
+        "invariant=", summary.invariant_site_count, ", ",
+        "singleton=", summary.singleton_site_count, ", ",
+        "parsimony_informative=", summary.parsimony_informative_site_count,
+        ")")
+end
+
+
+function Base.show(io::IO, ::MIME"text/plain", summary::AlignmentSummary)
+    println(io, "AlignmentSummary")
+    println(io, "  Counts are computed over all sites in this alignment.")
+    println(io, "  Sequences                     : ", summary.sequence_count)
+    println(io, "  Sites                         : ", summary.site_count)
+    println(io, "  Variable sites                : ", summary.variable_site_count,
+        " of ", summary.site_count, " (", percent_string(summary.variable_site_count, summary.site_count), ")")
+    println(io, "  Invariant sites               : ", summary.invariant_site_count,
+        " of ", summary.site_count, " (", percent_string(summary.invariant_site_count, summary.site_count), ")")
+    println(io, "  Singleton variable sites      : ", summary.singleton_site_count)
+    println(io, "  Parsimony-informative sites   : ", summary.parsimony_informative_site_count)
+    print(io, "  Note                          : SNP and variable-site counts are equivalent for unambiguous DNA.")
 end

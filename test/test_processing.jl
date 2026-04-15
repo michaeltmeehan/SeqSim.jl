@@ -60,12 +60,7 @@
 end
 
 @testset "site counts, classifications, differences, and summaries" begin
-    alignment = [
-        Sequence("ACGTAA"; taxon="a"),
-        Sequence("ACGTAC"; taxon="b"),
-        Sequence("ATGTCC"; taxon="c"),
-        Sequence("ATGTCT"; taxon="d"),
-    ]
+    alignment = small_alignment_fixture()
 
     counts = site_state_counts(alignment)
     @test size(counts) == (4, 6)
@@ -109,4 +104,15 @@ end
     @test summary.invariant_site_count == 3
     @test summary.singleton_site_count == 1
     @test summary.parsimony_informative_site_count == 2
+
+    compact = sprint(show, summary)
+    @test occursin("AlignmentSummary(4 sequences, 6 sites", compact)
+    @test occursin("variable=3", compact)
+
+    text = sprint(show, MIME"text/plain"(), summary)
+    @test occursin("AlignmentSummary", text)
+    @test occursin("Counts are computed over all sites in this alignment.", text)
+    @test !occursin("validated alignment", text)
+    @test occursin("Variable sites                : 3 of 6 (50.0%)", text)
+    @test occursin("Parsimony-informative sites   : 2", text)
 end
