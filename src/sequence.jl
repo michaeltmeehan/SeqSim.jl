@@ -153,24 +153,6 @@ function Base.show(io::IO, seq::Sequence)
 end
 
 
-function get_snps(aln::Alignment)
-    validate_alignment(aln)
-    snps = Vector{Int}()
-
-    for site in eachindex(aln[1].value)
-        nucleotide = aln[1].value[site]
-
-        for seq in aln[2:end]
-            if seq.value[site] != nucleotide
-                push!(snps, site)
-                break
-            end
-        end
-    end
-    return snps
-end
-
-
 function Base.show(io::IO, ::MIME"text/plain", aln::Vector{Sequence})
     if isempty(aln)
         println(io, title_style("Alignment (empty)"))
