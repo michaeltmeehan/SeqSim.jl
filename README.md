@@ -34,6 +34,7 @@ The active core currently supports:
 - SNP/variable-site detection, SNP-only extraction, and reference-based SNP counts
 - substitution models `JC`, `F81`, `K2P`, `HKY`, and `GTR`
 - site models with invariant sites and optional discrete gamma rate categories
+- optional tree-driven simulation from `TreeSim.Tree` via a package extension
 - write-only alignment export to FASTA, NEXUS, and PHYLIP
 
 ## Explicitly unsupported for now
@@ -42,12 +43,12 @@ The current standalone core does not support:
 
 - RNA, amino acids, ambiguity codes, gaps, or missing sequence states
 - read-side sequence/alignment IO
-- tree package integration or orchestration workflows
+- broad tree package integration or orchestration workflows
 - broad format conversion
 - modelling features beyond the substitution/site models listed above
 
-Future tree-facing behaviour should be added through narrow adapters rather
-than by making this package depend on upstream tree packages.
+Tree-facing behaviour is kept behind narrow optional adapters rather than by
+making the core package depend on upstream tree packages.
 
 ## Core concepts
 
@@ -90,10 +91,86 @@ writes the alignment to FASTA. `rand_seq` returns a `Sequence`. The
 back into a `Sequence` for external use.
 
 The `SiteModel(12, 0.1, 2, 1.0, 0.0, substitution_model)` arguments are:
-sequence length, invariant-site proportion, number of discrete gamma categories,
-gamma shape, clock rate variation placeholder, and substitution model. In this
-small example the substitution model is `HKY` with equal base frequencies and
+sequence length, mutation rate, number of discrete gamma categories, gamma
+shape, invariant-site proportion, and substitution model. In this small example
+the substitution model is `HKY` with equal base frequencies and
 transition/transversion ratio `2.0`.
+
+## Optional TreeSim bridge
+
+When `TreeSim.jl` is loaded, SeqSim exposes extension methods for explicit
+bridge functions:
+
+```julia
+using Random
+using SeqSim
+using TreeSim
+
+tree = Tree(
+    [0.0, 0.5, 0.7],
+    [2, 0, 0],
+    [3, 0, 0],
+    [0, 1, 1],
+    [Root, SampledLeaf, SampledLeaf],
+    [0, 0, 0],
+    [0, 101, 102],
+)
+
+site_model = SiteModel(12, 0.1, 0, 0.0, 0.0, JC())
+simulation = simulate_tree_sequences(MersenneTwister(1), tree, site_model)
+alignment = simulate_alignment(MersenneTwister(1), tree, site_model)
+
+simulation.node_sequences # primary all-node result, indexed by TreeSim node id
+simulation.tip_alignment  # derived tip-only Vector{Sequence}, ordered like simulation.tips
+simulation.root           # TreeSim root id used for propagation
+simulation.tips           # TreeSim tip ids in the same order as tip_alignment
+alignment                 # the same tip-only product, returned directly
+```
+
+`simulate_alignment(rng, tree, site_model)` is a thin wrapper that returns only
+the derived `tip_alignment`; use `simulate_tree_sequences` when all node
+sequences are needed. `simulate_on_tree` remains available as a compatibility
+alias for `simulate_tree_sequences`.
+
+The bridge assumes a canonical rooted `TreeSim.Tree`: one root, reachable nodes,
+parent-child consistency, preorder traversal, and TreeSim's node-id-as-vector-
+index contract. SeqSim uses `TreeSim.branch_length(tree, node)` as the
+nonnegative evolutionary branch length on the incoming edge to each non-root
+node. The rooted structure and branch lengths drive simulation. TreeSim labels
+and node times are preserved as sequence metadata: nonzero `tree.label[node]`
+becomes `Sequence.taxon`, label `0` becomes `"node_$(node)"`, and
+`tree.time[node]` becomes `Sequence.time`. Absolute node times are metadata in
+the bridge result, not the direct evolutionary simulation primitive. TreeSim
+remains an optional weak dependency.
+
+### Composed EpiSim to TreeSim to SeqSim path
+
+When both optional bridges are loaded, a sampled `EpiSim.EventLog` can be
+converted to a TreeSim sampled-ancestry tree and then used for sequence
+simulation:
+
+```julia
+using EpiSim
+using Random
+using SeqSim
+using TreeSim
+
+log = EventLog(
+    [0.0, 1.0, 2.0, 3.0, 4.0],
+    [1, 2, 3, 2, 3],
+    [0, 1, 1, 0, 0],
+    [EK_Seeding, EK_Transmission, EK_Transmission, EK_SerialSampling, EK_SerialSampling],
+)
+
+tree = tree_from_eventlog(log)
+site_model = SiteModel(12, 0.1, 0, 0.0, 0.0, JC())
+
+alignment = simulate_alignment(MersenneTwister(2), tree, site_model)
+```
+
+`tree_from_eventlog` extracts retained sampled ancestry, not the full outbreak
+history. The resulting alignment is ordered like `TreeSim.tips(tree)`, with tip
+labels and times preserved through the SeqSim metadata policy.
 
 ## Small alignment example
 

@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "a87e14dc86f5dc3beb227c659c11a440d73f7f7d"
+project_hash = "73ef35e1e18c7c9892e0a37187de4db4a481852c"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -218,6 +218,12 @@ deps = ["Crayons", "Distributions", "LinearAlgebra", "Random", "StaticArrays"]
 path = "."
 uuid = "c8f56641-52ca-49da-8ebe-34c7ee607908"
 version = "0.1.0"
+
+    [deps.SeqSim.extensions]
+    TreeSimExt = "TreeSim"
+
+    [deps.SeqSim.weakdeps]
+    TreeSim = "dc327cbd-6c9b-4100-9a5f-ed0bbf0cf4d5"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"

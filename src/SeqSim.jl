@@ -15,6 +15,7 @@ include("substitution.jl")
 include("site.jl")
 include("sequence_simulator.jl")
 include("SequencePropagator.jl")
+include("tree_adaptors.jl")
 include("export.jl")
 
 
@@ -22,6 +23,7 @@ export JC, F81, K2P, HKY, GTR, SubstitutionModel
 export SiteModel
 export rand_seq, SequencePropagator
 export Sequence
+export TreeSequenceSimulation, simulate_on_tree, simulate_tree_sequences, simulate_alignment
 export filter_sequences, filter_sites
 export variable_sites, invariant_sites, get_snps, snp_alignment, invariant_filtered_alignment
 export site_states, site_snp_counts, sequence_snp_counts
