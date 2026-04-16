@@ -2,31 +2,53 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
+    name: Julia ${{ matrix.julia-version }} - ubuntu-latest
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: SeqSim.jl
+    strategy:
+      fail-fast: false
+      matrix:
+        julia-version:
+          - '1.11'
+          - '1.12'
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout SeqSim.jl
+        uses: actions/checkout@v4
+        with:
+          path: SeqSim.jl
 
-    - name: Set up Julia
-      uses: julia-actions/setup-julia@v1
-      with:
-        version: '1'
+      - name: Checkout TreeSim.jl
+        uses: actions/checkout@v4
+        with:
+          repository: michaeltmeehan/TreeSim.jl
+          path: TreeSim.jl
 
-    - name: Install dependencies
-      run: julia -e 'using Pkg; Pkg.instantiate()'
+      - name: Checkout EpiSim.jl
+        uses: actions/checkout@v4
+        with:
+          repository: michaeltmeehan/EpiSim.jl
+          path: EpiSim.jl
 
-    - name: Run tests
-      run: julia -e '
-        using Pkg;
-        Pkg.activate(".");
-        Pkg.instantiate();
-        Pkg.test()'
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - name: Cache Julia artifacts
+        uses: julia-actions/cache@v2
+
+      - name: Instantiate dependencies
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run tests
+        run: julia --project=. -e 'using Pkg; Pkg.test()'
