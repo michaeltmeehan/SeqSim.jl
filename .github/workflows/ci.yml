@@ -50,5 +50,11 @@ jobs:
       - name: Instantiate dependencies
         run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
+      - name: Instantiate TreeSim.jl dependencies
+        run: julia --project=../TreeSim.jl -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Instantiate EpiSim.jl dependencies
+        run: julia --project=../EpiSim.jl -e 'using Pkg; Pkg.instantiate()'
+
       - name: Run tests
         run: julia --project=. -e 'using Pkg; Pkg.test()'
